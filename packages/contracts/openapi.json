@@ -3526,7 +3526,8 @@
             "maximum": 9007199254740991
           },
           "tipsKes": {
-            "type": "number"
+            "type": "number",
+            "description": "Tips paid for your jokes, before the platform fee."
           }
         },
         "required": [

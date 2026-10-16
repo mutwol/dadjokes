@@ -7,6 +7,7 @@ dist-ssr
 .env
 .env.*
 !.env.example
+!.env.*.example
 coverage
 .DS_Store
 .idea
@@ -18,3 +19,7 @@ coverage
 
 # Images uploaded with STORAGE_DRIVER=local
 uploads/
+
+# Production secrets and local backups
+.env.production
+backups/

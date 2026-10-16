@@ -1,0 +1,14 @@
+# Build context for apps/web/Dockerfile (BuildKit reads this instead of the root .dockerignore).
+.git
+.github
+docs
+docker
+**/node_modules
+**/dist
+**/dist-worker
+**/.env
+**/.env.*
+**/.DS_Store
+*.rdb
+apps/api/*
+!apps/api/package.json

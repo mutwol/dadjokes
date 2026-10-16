@@ -1120,6 +1120,7 @@ export interface components {
             /** @description Readers your jokes were delivered to. */
             reached: number;
             opened: number;
+            /** @description Tips paid for your jokes, before the platform fee. */
             tipsKes: number;
         };
         ReactRequest: {

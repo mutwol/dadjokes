@@ -32,6 +32,8 @@ COPY --from=prod-deps /repo/node_modules /repo/node_modules
 COPY --from=prod-deps /repo/apps/api/node_modules ./node_modules
 COPY --from=build /repo/apps/api/dist ./dist
 COPY apps/api/package.json ./
+# Local image storage (STORAGE_DRIVER=local). Owned by node so a volume mounted here is writable.
+RUN mkdir -p /data/uploads && chown node:node /data/uploads
 USER node
 EXPOSE 3000
 CMD ["node", "dist/main.js"]

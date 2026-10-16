@@ -6,6 +6,7 @@ import * as schema from "./schema";
 import { jokes, jokeTopics, subscriptions, topics, userPreferences, userRoles, users } from "./schema";
 import type { JokeStatus, Tone } from "./schema";
 import { addDays, localDate } from "../common/dates";
+import { TOPICS } from "./migrate";
 import { SEED_JOKES } from "./seed-jokes";
 
 /**
@@ -14,7 +15,6 @@ import { SEED_JOKES } from "./seed-jokes";
  * and test jokes around today (see seed-jokes.ts).
  * Safe to run more than once; each run moves the test jokes' days up to today.
  */
-const TOPICS = ["Wordplay", "Food", "School", "Work", "Animals", "Kids", "Science", "Sports"];
 
 /** Today's date in the seeded readers' time zone. */
 const SEED_TIMEZONE = "Africa/Nairobi";

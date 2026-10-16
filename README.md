@@ -7,7 +7,8 @@ One curated dad joke a day, delivered like a status. Anyone can read, write, or 
 | `apps/web` | React app (Vite, React Router, Tailwind). See its README for screens and design. |
 | `apps/api` | NestJS API and background worker, PostgreSQL, Redis |
 | `packages/contracts` | OpenAPI spec and the typed API client the web app uses |
-| `docs/backend-architecture.md` | How the backend is designed and what comes next |
+| `docs/backend-architecture.md` | How the backend is designed |
+| `docs/deploy.md` | Running it in production: one server with Docker, HTTPS, M-Pesa, backups |
 
 ## Getting started
 
@@ -26,8 +27,12 @@ and about 30 test jokes: a fortnight of delivered jokes, one for today (plus a K
 one), a few scheduled ahead, and some in review. Joke days are relative to today, so
 running it again moves them along. `SEED=false pnpm db:up` only migrates.
 
-Open http://localhost:5173 and sign up. The sign-in code is printed in the API's log and
-also lands in Mailpit at http://localhost:8025. API docs: http://localhost:3000/docs.
+Open http://localhost:5173 and sign up. The sign-in code is printed in the API's log and also
+lands in Mailpit at http://localhost:8025. API docs: http://localhost:3000/docs.
+
+Seeded accounts you can sign in as: `curator@daddyjokes.local` (reviews jokes at `/curate`)
+and the writers, e.g. `wanjiru_puns@seed.daddyjokes.local` (Studio with real reach). M-Pesa runs
+in a fake mode in development: tips settle after about 3 seconds; numbers ending 0000 fail.
 
 ## Everyday commands
 
@@ -40,4 +45,6 @@ also lands in Mailpit at http://localhost:8025. API docs: http://localhost:3000/
 | `pnpm lint` | Type checks and lint for every package |
 | `pnpm build` | Production builds |
 | `pnpm contracts` | After changing an endpoint: re-export the OpenAPI spec and regenerate the client |
+| `pnpm --filter api user:role <email> curator` | Make someone a curator |
+| `pnpm --filter api push:keys` | New VAPID keys for push notifications |
 | `pnpm --filter api db:generate` | After changing `apps/api/src/db/schema.ts`: write a new SQL migration |

@@ -1,0 +1,114 @@
+# Production on a single server. See docs/deploy.md.
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+name: daddy-jokes
+
+x-api: &api
+  build:
+    context: .
+    dockerfile: apps/api/Dockerfile
+  image: daddy-jokes-api
+  restart: unless-stopped
+  env_file: .env.production
+  environment: &api-env
+    NODE_ENV: production
+    PORT: "3000"
+    DATABASE_URL: postgres://daddy:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/daddy_jokes
+    REDIS_URL: redis://redis:6379
+    WEB_ORIGIN: https://${DOMAIN:?set DOMAIN}
+    UPLOAD_DIR: /data/uploads
+  volumes:
+    - uploads:/data/uploads
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+    image: daddy-jokes-web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+  api:
+    <<: *api
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    <<: *api
+    command: ["node", "dist/worker.js"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+
+  # Applies migrations before the API and worker start. Never seeds test data here.
+  migrate:
+    <<: *api
+    restart: "no"
+    command: ["node", "dist/db/migrate.js"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: daddy
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: daddy_jokes
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U daddy -d daddy_jokes"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+
+  # A compressed dump every night at 02:00 UTC, keeping the last 14. Copy ./backups off the server too.
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./backups:/backups
+      - ./deploy/backup.sh:/backup.sh:ro
+    entrypoint: ["sh", "/backup.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  redisdata:
+  uploads:
+  caddy_data:
+  caddy_config:
