@@ -1,4 +1,6 @@
-# Local services for the API. Start with `pnpm db:up`.
+# Local services for the API. Start with `pnpm db:up` (or `docker compose up -d`).
+# On every start, the `migrate` service applies database migrations and loads
+# development data, including test jokes, then exits.
 services:
   postgres:
     image: postgres:16-alpine
@@ -27,6 +29,25 @@ services:
     ports:
       - "1025:1025"
       - "8025:8025"
+
+  # Applies migrations, then seeds topics, writers, sample readers and test
+  # jokes around today. Safe to repeat. Rebuilt on each start, so new migrations
+  # and seed changes are picked up. Skip the seed with SEED=false.
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    image: daddy-jokes-api
+    pull_policy: build
+    command: ["sh", "-c", "node dist/db/migrate.js && if [ \"$$SEED\" != false ]; then node dist/db/seed.js; fi"]
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgres://daddy:daddy@postgres:5432/daddy_jokes
+      SEED: ${SEED:-true}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
 volumes:
   pgdata:

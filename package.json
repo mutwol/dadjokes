@@ -14,9 +14,10 @@
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
-    "db:up": "docker compose up -d",
+    "db:up": "docker compose up -d postgres redis mailpit && docker compose run --rm --build migrate",
     "db:migrate": "pnpm --filter api db:migrate",
     "db:seed": "pnpm --filter api db:seed",
-    "contracts": "pnpm --filter api openapi && pnpm --filter @daddy-jokes/contracts generate"
+    "contracts": "pnpm --filter api openapi && pnpm --filter @daddy-jokes/contracts generate",
+    "db:down": "docker compose down"
   }
 }

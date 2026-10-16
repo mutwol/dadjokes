@@ -71,12 +71,23 @@ Interactive docs run at `http://localhost:3000/docs` in development.
 4. Add an e2e test in `apps/api/test`.
 5. Run `pnpm contracts` from the root to regenerate the client types the web app uses.
 
-Schema changes: edit `src/db/schema.ts`, run `pnpm --filter api db:generate`, review the SQL in `src/db/migrations`, then `pnpm db:migrate`.
+Schema changes: edit `src/db/schema.ts`, run `pnpm --filter api db:generate`, review the SQL in `src/db/migrations`, then `pnpm db:migrate` (or `pnpm db:up`, which rebuilds the `migrate` container and applies it).
+
+## Local data
+
+`docker compose up` runs the `migrate` service (built from `apps/api/Dockerfile`) once Postgres
+is healthy: `node dist/db/migrate.js`, then `node dist/db/seed.js` unless `SEED=false`. The seed
+is idempotent and refuses to run with `NODE_ENV=production` unless `ALLOW_SEED=true`.
+
+Test jokes live in `src/db/seed-jokes.ts`, each with a day relative to today. Their ids are
+derived from a fixed key, so re-seeding moves the same rows to new days instead of adding rows;
+a day already taken by a real (non-seed) joke is left alone and the test joke goes back to review.
 
 ## What comes next
 
 **Phase 2: the daily joke**
-- `submissions` (in_review → scheduled → delivered | declined | withdrawn), image uploads via presigned URLs.
+- Done: `jokes` (in_review → scheduled → delivered | declined | withdrawn) and `joke_topics`. The database allows one joke per day for everyone and one per day per region, and requires a day exactly when a joke is scheduled or delivered.
+- Image uploads via presigned URLs.
 - `curation`: review queue, possible copies via `pg_trgm`, `daily_picks` per date (global plus regional).
 - `deliveries (user_id, local_date, joke_id, delivered_at, opened_at, expires_at)`, unique on `(user_id, local_date)`. The hourly worker job assigns jokes to readers whose local delivery hour just arrived, then queues push notifications. Retries are safe because of the unique key.
 - `GET /v1/me/today` returns sealed jokes without content; `POST /v1/me/deliveries/{date}/open` returns the joke and records the view, so "open once" is enforced on the server.

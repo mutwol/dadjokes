@@ -1,15 +1,22 @@
+import { createHash } from "node:crypto";
+import { and, inArray, isNotNull, notInArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "./schema";
-import { subscriptions, topics, userPreferences, userRoles, users } from "./schema";
-import type { Tone } from "./schema";
+import { jokes, jokeTopics, subscriptions, topics, userPreferences, userRoles, users } from "./schema";
+import type { JokeStatus, Tone } from "./schema";
+import { SEED_JOKES } from "./seed-jokes";
 
 /**
- * Development data: the topics used in onboarding and the writers from the
- * web app's mock data, with some sample readers so "most subscribed" has an order.
- * Safe to run more than once.
+ * Development data: the topics used in onboarding, the writers from the web
+ * app's mock data with some sample readers so "most subscribed" has an order,
+ * and test jokes around today (see seed-jokes.ts).
+ * Safe to run more than once; each run moves the test jokes' days up to today.
  */
 const TOPICS = ["Wordplay", "Food", "School", "Work", "Animals", "Kids", "Science", "Sports"];
+
+/** Today's date in the seeded readers' time zone. */
+const SEED_TIMEZONE = "Africa/Nairobi";
 
 const WRITERS: { name: string; handle: string; country: string; bio: string; tone: Tone; readers: number }[] = [
   { name: "Dan Whitfield", handle: "grillmaster_dan", country: "United Kingdom", bio: "Grill on, socks with sandals, jokes at the ready.", tone: "denim", readers: 31 },
@@ -32,21 +39,94 @@ export async function seed(databaseUrl: string) {
     for (let i = 1; i <= 31; i++) {
       readerIds.push(await upsertUser(db, { email: `reader${i}@seed.daddyjokes.local`, name: `Sample Reader ${i}`, handle: `sample_reader_${i}`, country: "Kenya", bio: "", tone: "navy" }, "reader"));
     }
+    const writerIds = new Map<string, string>();
     for (const w of WRITERS) {
       const id = await upsertUser(db, { email: `${w.handle}@seed.daddyjokes.local`, ...w }, "writer");
+      writerIds.set(w.handle, id);
       await db
         .insert(subscriptions)
         .values(readerIds.slice(0, w.readers).map((subscriberId) => ({ subscriberId, creatorId: id })))
         .onConflictDoNothing();
     }
-    console.log(`Seeded ${TOPICS.length} topics, ${WRITERS.length} writers and ${readerIds.length} readers.`);
+    const jokeCount = await seedJokes(db, writerIds);
+    console.log(
+      `Seeded ${TOPICS.length} topics, ${WRITERS.length} writers, ${readerIds.length} readers and ${jokeCount} jokes.`,
+    );
   } finally {
     await pool.end();
   }
 }
 
+type Db = ReturnType<typeof drizzle<typeof schema>>;
+
+async function seedJokes(db: Db, writerIds: Map<string, string>): Promise<number> {
+  const today = localDate(new Date(), SEED_TIMEZONE);
+  const rows = SEED_JOKES.map((j) => {
+    const creatorId = writerIds.get(j.writer);
+    if (!creatorId) throw new Error(`Seed joke "${j.key}" names unknown writer ${j.writer}`);
+    const deliverOn = j.day === undefined ? null : addDays(today, j.day);
+    const status: JokeStatus = deliverOn === null ? (j.status ?? "in_review") : deliverOn <= today ? "delivered" : "scheduled";
+    return {
+      id: seedId(`joke:${j.key}`),
+      creatorId,
+      kind: "text" as const,
+      setup: j.setup,
+      punchline: j.punchline,
+      background: j.background,
+      region: j.region ?? null,
+      status,
+      deliverOn,
+      submittedAt: new Date(`${addDays(deliverOn ?? today, deliverOn ? -7 : -1)}T09:00:00Z`),
+      topics: j.topics,
+    };
+  });
+  const ids = rows.map((r) => r.id);
+
+  await db.transaction(async (tx) => {
+    // Days already taken by jokes that aren't test jokes stay theirs.
+    const taken = await tx
+      .select({ deliverOn: jokes.deliverOn, region: jokes.region })
+      .from(jokes)
+      .where(and(isNotNull(jokes.deliverOn), notInArray(jokes.id, ids)));
+    const takenDays = new Set(taken.map((t) => `${t.deliverOn}|${t.region ?? ""}`));
+
+    // Free the test jokes' current days first, so moving them along can't collide with each other.
+    await tx.update(jokes).set({ deliverOn: null, status: "in_review" }).where(inArray(jokes.id, ids));
+
+    for (const { topics: slugs, ...row } of rows) {
+      if (row.deliverOn && takenDays.has(`${row.deliverOn}|${row.region ?? ""}`)) {
+        row.deliverOn = null;
+        row.status = "in_review";
+      }
+      const { id: _id, ...changes } = row;
+      await tx.insert(jokes).values(row).onConflictDoUpdate({ target: jokes.id, set: changes });
+      await tx.delete(jokeTopics).where(inArray(jokeTopics.jokeId, [row.id]));
+      await tx.insert(jokeTopics).values(slugs.map((topicSlug) => ({ jokeId: row.id, topicSlug })));
+    }
+  });
+  return rows.length;
+}
+
+/** A stable UUID derived from a name, so seeded rows keep their ids across runs. */
+function seedId(name: string): string {
+  const h = createHash("sha1").update(`daddy-jokes-seed:${name}`).digest("hex");
+  const variant = ((parseInt(h[16], 16) & 0x3) | 0x8).toString(16);
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-5${h.slice(13, 16)}-${variant}${h.slice(17, 20)}-${h.slice(20, 32)}`;
+}
+
+/** YYYY-MM-DD for the given instant in an IANA time zone. */
+function localDate(at: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(at);
+}
+
+function addDays(isoDate: string, days: number): string {
+  const d = new Date(`${isoDate}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 async function upsertUser(
-  db: ReturnType<typeof drizzle<typeof schema>>,
+  db: Db,
   u: { email: string; name: string; handle: string; country: string; bio: string; tone: Tone },
   role: "reader" | "writer",
 ): Promise<string> {
@@ -63,6 +143,9 @@ async function upsertUser(
 if (require.main === module) {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not set");
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_SEED !== "true") {
+    throw new Error("Refusing to seed test data with NODE_ENV=production. Set ALLOW_SEED=true to override.");
+  }
   seed(url).catch((err: unknown) => {
     console.error(err);
     process.exit(1);

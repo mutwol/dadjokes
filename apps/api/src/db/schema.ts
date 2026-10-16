@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   check,
+  date,
   index,
   integer,
   pgEnum,
@@ -14,8 +15,9 @@ import {
 } from "drizzle-orm/pg-core";
 
 /*
- * Phase 1 tables: accounts, sign-in, roles, preferences and subscriptions.
- * Jokes, deliveries, engagement and payments arrive in later migrations.
+ * Accounts, sign-in, roles, preferences and subscriptions (phase 1), and jokes
+ * with their topics (phase 2). Deliveries, engagement and payments arrive in
+ * later migrations.
  * All timestamps are stored in UTC; a reader's own clock comes from `timezone`.
  */
 
@@ -170,6 +172,71 @@ export const payoutMethods = pgTable("payout_methods", {
   updatedAt: updatedAt(),
 });
 
+export const jokeKindEnum = pgEnum("joke_kind", ["text", "image"]);
+/**
+ * in_review → scheduled (a curator picked a day) → delivered (that day has begun).
+ * A joke can also be declined by a curator or withdrawn by its writer.
+ */
+export const jokeStatusEnum = pgEnum("joke_status", ["in_review", "scheduled", "delivered", "declined", "withdrawn"]);
+
+/** A joke a writer submitted. Text jokes have a setup and punchline; image jokes an image. */
+export const jokes = pgTable(
+  "jokes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    creatorId: uuid("creator_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: jokeKindEnum("kind").notNull().default("text"),
+    setup: text("setup"),
+    punchline: text("punchline"),
+    imageUrl: text("image_url"),
+    imageAlt: text("image_alt"),
+    caption: text("caption"),
+    background: toneEnum("background").notNull().default("red"),
+    /** Country whose readers need local knowledge to get it, e.g. Kenya. Null: works everywhere. */
+    region: text("region"),
+    status: jokeStatusEnum("status").notNull().default("in_review"),
+    /** The day it goes out. Set exactly when the joke is scheduled or delivered. */
+    deliverOn: date("deliver_on", { mode: "string" }),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("jokes_creator_idx").on(t.creatorId, t.submittedAt),
+    /** The curators' review queue, oldest first. */
+    index("jokes_review_queue_idx").on(t.submittedAt).where(sql`${t.status} = 'in_review'`),
+    /** One joke per day for everyone, plus at most one per day for each region. */
+    uniqueIndex("jokes_one_per_day_key")
+      .on(t.deliverOn, sql`coalesce(${t.region}, '')`)
+      .where(sql`${t.deliverOn} is not null`),
+    check(
+      "jokes_content",
+      sql`(${t.kind} = 'text' and ${t.setup} is not null and ${t.punchline} is not null)
+        or (${t.kind} = 'image' and ${t.imageUrl} is not null and ${t.imageAlt} is not null)`,
+    ),
+    check(
+      "jokes_scheduled_has_day",
+      sql`(${t.deliverOn} is not null) = (${t.status} in ('scheduled', 'delivered'))`,
+    ),
+  ],
+);
+
+export const jokeTopics = pgTable(
+  "joke_topics",
+  {
+    jokeId: uuid("joke_id")
+      .notNull()
+      .references(() => jokes.id, { onDelete: "cascade" }),
+    topicSlug: text("topic_slug")
+      .notNull()
+      .references(() => topics.slug, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.jokeId, t.topicSlug] }), index("joke_topics_topic_idx").on(t.topicSlug)],
+);
+
 export type Role = (typeof roleEnum.enumValues)[number];
 export type Tone = (typeof toneEnum.enumValues)[number];
 export type User = typeof users.$inferSelect;
+export type Joke = typeof jokes.$inferSelect;
+export type JokeStatus = (typeof jokeStatusEnum.enumValues)[number];

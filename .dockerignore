@@ -1,0 +1,16 @@
+# Keep the build context small: only what apps/api/Dockerfile copies.
+.git
+.github
+docs
+docker
+**/node_modules
+**/dist
+**/dist-worker
+**/.env
+**/.DS_Store
+*.rdb
+# The web app isn't built in this image; pnpm only needs its manifest.
+apps/web/*
+!apps/web/package.json
+packages/contracts/*
+!packages/contracts/package.json

@@ -15,11 +15,16 @@ Needs Node 22.12+, pnpm and Docker.
 
 ```bash
 pnpm install
-pnpm db:up                       # Postgres, Redis and Mailpit in Docker
 cp apps/api/.env.example apps/api/.env
-pnpm db:migrate && pnpm db:seed  # tables, topics and sample writers
-pnpm dev                         # web on :5173, API on :3000, plus the worker
+pnpm db:up   # Postgres, Redis and Mailpit in Docker, then migrations and test data
+pnpm dev     # web on :5173, API on :3000, plus the worker
 ```
+
+`pnpm db:up` (or plain `docker compose up -d`) runs a one-off `migrate` container after
+Postgres is healthy. It applies migrations and seeds topics, five writers, sample readers
+and about 30 test jokes: a fortnight of delivered jokes, one for today (plus a Kenya-only
+one), a few scheduled ahead, and some in review. Joke days are relative to today, so
+running it again moves them along. `SEED=false pnpm db:up` only migrates.
 
 Open http://localhost:5173 and sign up. The sign-in code is printed in the API's log and
 also lands in Mailpit at http://localhost:8025. API docs: http://localhost:3000/docs.
@@ -29,6 +34,8 @@ also lands in Mailpit at http://localhost:8025. API docs: http://localhost:3000/
 | Command | Does |
 | --- | --- |
 | `pnpm dev` | Web, API and worker with reload |
+| `pnpm db:up` · `pnpm db:down` | Start the Docker services (migrating and seeding) · stop them. `docker compose down -v` also wipes the data |
+| `pnpm db:migrate` · `pnpm db:seed` | The same two steps from your machine, without Docker's `migrate` container |
 | `pnpm test` | API end-to-end tests against the `daddy_jokes_test` database (`pnpm db:up` creates it) |
 | `pnpm lint` | Type checks and lint for every package |
 | `pnpm build` | Production builds |
