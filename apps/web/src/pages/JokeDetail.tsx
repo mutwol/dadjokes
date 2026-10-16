@@ -5,8 +5,12 @@ import { Avatar } from "../components/Avatar.tsx";
 import { Icon } from "../components/Icon.tsx";
 import { GroanMeter, ReactionBar } from "../components/Reactions.tsx";
 import { StoryCard } from "../components/StoryCard.tsx";
-import { creatorById, jokeById, longDate } from "../data/mock.ts";
+import {
+  creatorById,
+  jokeById,
+} from "../data/mock.ts";
 import { compact, totalReactions } from "../data/reactions.ts";
+import { longDate } from "../data/dates.ts";
 import { useStore } from "../state/useStore.ts";
 import "./JokeDetail.css";
 

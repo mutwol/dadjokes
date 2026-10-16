@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 import type { Me, Session } from "../api/client.ts";
-import type { Comment, Joke, NotificationState, ReactionKind, Role, Submission } from "../data/types.ts";
+import type { Comment, Joke, NotificationState, ReactionKind, Role } from "../data/types.ts";
 
 export type AuthStatus = "loading" | "signed-out" | "signed-in";
 
@@ -12,7 +12,7 @@ export interface Store {
   /** Stores a new session (after sign-in) and its account. */
   setSession: (session: Session) => void;
   setAccount: (me: Me) => void;
-  hasRole: (r: Role) => boolean;
+  hasRole: (r: Me["roles"][number]) => boolean;
   /** Turns reading or writing on/off on the server. Resolves when saved. */
   setRole: (r: Role, on: boolean) => Promise<void>;
   signOut: () => Promise<void>;
@@ -27,8 +27,6 @@ export interface Store {
   reactionsFor: (joke: Joke) => Record<ReactionKind, number>;
   commentsFor: (joke: Joke) => Comment[];
   addComment: (jokeId: string, body: string) => void;
-  submissions: Submission[];
-  submit: (s: Omit<Submission, "id" | "status" | "submittedOn">) => void;
   deliveryHour: number;
   setDeliveryHour: (h: number) => void;
   toast: string | null;

@@ -14,7 +14,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=.env src/db/migrate.ts",
     "db:seed": "tsx --env-file-if-exists=.env src/db/seed.ts",
-    "openapi": "nest build && node --env-file-if-exists=.env dist/openapi.js"
+    "openapi": "nest build && node --env-file-if-exists=.env dist/openapi.js",
+    "user:role": "tsx --env-file-if-exists=.env src/scripts/set-role.ts"
   },
   "dependencies": {
     "@nestjs/bullmq": "^12.0.0",

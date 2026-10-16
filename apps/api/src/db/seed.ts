@@ -5,6 +5,7 @@ import { Pool } from "pg";
 import * as schema from "./schema";
 import { jokes, jokeTopics, subscriptions, topics, userPreferences, userRoles, users } from "./schema";
 import type { JokeStatus, Tone } from "./schema";
+import { addDays, localDate } from "../common/dates";
 import { SEED_JOKES } from "./seed-jokes";
 
 /**
@@ -17,6 +18,8 @@ const TOPICS = ["Wordplay", "Food", "School", "Work", "Animals", "Kids", "Scienc
 
 /** Today's date in the seeded readers' time zone. */
 const SEED_TIMEZONE = "Africa/Nairobi";
+
+export const CURATOR_EMAIL = "curator@daddyjokes.local";
 
 const WRITERS: { name: string; handle: string; country: string; bio: string; tone: Tone; readers: number }[] = [
   { name: "Dan Whitfield", handle: "grillmaster_dan", country: "United Kingdom", bio: "Grill on, socks with sandals, jokes at the ready.", tone: "denim", readers: 31 },
@@ -48,9 +51,17 @@ export async function seed(databaseUrl: string) {
         .values(readerIds.slice(0, w.readers).map((subscriberId) => ({ subscriberId, creatorId: id })))
         .onConflictDoNothing();
     }
+    // A curator to review the queue with. Sign in as curator@daddyjokes.local; the code is in the API log.
+    const curatorId = await upsertUser(
+      db,
+      { email: CURATOR_EMAIL, name: "Head Curator", handle: "head_curator", country: "Kenya", bio: "Picks the daily joke.", tone: "navy" },
+      "reader",
+    );
+    await db.insert(userRoles).values({ userId: curatorId, role: "curator" }).onConflictDoNothing();
+
     const jokeCount = await seedJokes(db, writerIds);
     console.log(
-      `Seeded ${TOPICS.length} topics, ${WRITERS.length} writers, ${readerIds.length} readers and ${jokeCount} jokes.`,
+      `Seeded ${TOPICS.length} topics, ${WRITERS.length} writers, ${readerIds.length} readers, a curator (${CURATOR_EMAIL}) and ${jokeCount} jokes.`,
     );
   } finally {
     await pool.end();
@@ -76,6 +87,7 @@ async function seedJokes(db: Db, writerIds: Map<string, string>): Promise<number
       region: j.region ?? null,
       status,
       deliverOn,
+      declineReason: status === "declined" ? ("possible_copy" as const) : null,
       submittedAt: new Date(`${addDays(deliverOn ?? today, deliverOn ? -7 : -1)}T09:00:00Z`),
       topics: j.topics,
     };
@@ -91,12 +103,16 @@ async function seedJokes(db: Db, writerIds: Map<string, string>): Promise<number
     const takenDays = new Set(taken.map((t) => `${t.deliverOn}|${t.region ?? ""}`));
 
     // Free the test jokes' current days first, so moving them along can't collide with each other.
-    await tx.update(jokes).set({ deliverOn: null, status: "in_review" }).where(inArray(jokes.id, ids));
+    await tx
+      .update(jokes)
+      .set({ deliverOn: null, status: "in_review", declineReason: null })
+      .where(inArray(jokes.id, ids));
 
     for (const { topics: slugs, ...row } of rows) {
       if (row.deliverOn && takenDays.has(`${row.deliverOn}|${row.region ?? ""}`)) {
         row.deliverOn = null;
         row.status = "in_review";
+        row.declineReason = null;
       }
       const { id: _id, ...changes } = row;
       await tx.insert(jokes).values(row).onConflictDoUpdate({ target: jokes.id, set: changes });
@@ -112,17 +128,6 @@ function seedId(name: string): string {
   const h = createHash("sha1").update(`daddy-jokes-seed:${name}`).digest("hex");
   const variant = ((parseInt(h[16], 16) & 0x3) | 0x8).toString(16);
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-5${h.slice(13, 16)}-${variant}${h.slice(17, 20)}-${h.slice(20, 32)}`;
-}
-
-/** YYYY-MM-DD for the given instant in an IANA time zone. */
-function localDate(at: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(at);
-}
-
-function addDays(isoDate: string, days: number): string {
-  const d = new Date(`${isoDate}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
 }
 
 async function upsertUser(

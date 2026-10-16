@@ -1,7 +1,19 @@
 import { ApiError, createApiClient, unwrap } from "@daddy-jokes/contracts";
 
 export { ApiError, unwrap };
-export type { CompleteOnboardingRequest, Creator, Me, Session, Topic } from "@daddy-jokes/contracts";
+export type {
+  CompleteOnboardingRequest,
+  CreateJokeRequest,
+  Creator,
+  CuratedJoke,
+  CurationCalendar,
+  Me,
+  PossibleCopy,
+  QueueItem,
+  Session,
+  Submission,
+  Topic,
+} from "@daddy-jokes/contracts";
 
 /** Empty in development: Vite proxies /v1 to the API. */
 const BASE_URL = import.meta.env.VITE_API_URL ?? "";

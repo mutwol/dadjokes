@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { api, errorMessage, refreshAccessToken, setAccessToken, unwrap } from "../api/client.ts";
 import type { Me, Session } from "../api/client.ts";
-import { DEFAULT_DELIVERY_HOUR, mySubmissions, seenDays } from "../data/mock.ts";
-import type { Comment, NotificationState, ReactionKind, Role, Submission } from "../data/types.ts";
+import { DEFAULT_DELIVERY_HOUR, seenDays } from "../data/mock.ts";
+import type { Comment, NotificationState, ReactionKind, Role } from "../data/types.ts";
 import { Ctx } from "./useStore.ts";
 import type { AuthStatus, Store } from "./useStore.ts";
 
@@ -25,7 +25,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [seen, setSeen] = useState(() => new Set(seenDays));
   const [reactions, setReactions] = useState<Record<string, ReactionKind>>({});
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
-  const [submissions, setSubmissions] = useState<Submission[]>(mySubmissions);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<number | undefined>(undefined);
 
@@ -169,17 +168,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             ...(prev[jokeId] ?? []),
           ],
         })),
-      submissions,
-      submit: (s) =>
-        setSubmissions((prev) => [
-          {
-            ...s,
-            id: `s-${Date.now()}`,
-            status: "in-review",
-            submittedOn: new Date().toISOString().slice(0, 10),
-          },
-          ...prev,
-        ]),
       deliveryHour: account?.preferences.deliveryHour ?? DEFAULT_DELIVERY_HOUR,
       setDeliveryHour,
       toast,
@@ -199,7 +187,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       reactions,
       react,
       comments,
-      submissions,
       setDeliveryHour,
       toast,
       showToast,

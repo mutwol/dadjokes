@@ -179,6 +179,15 @@ export const jokeKindEnum = pgEnum("joke_kind", ["text", "image"]);
  */
 export const jokeStatusEnum = pgEnum("joke_status", ["in_review", "scheduled", "delivered", "declined", "withdrawn"]);
 
+/** Why a curator didn't pick a joke. Shown to the writer. */
+export const declineReasonEnum = pgEnum("decline_reason", [
+  "possible_copy",
+  "not_a_dad_joke",
+  "offensive",
+  "unclear",
+  "other",
+]);
+
 /** A joke a writer submitted. Text jokes have a setup and punchline; image jokes an image. */
 export const jokes = pgTable(
   "jokes",
@@ -200,6 +209,11 @@ export const jokes = pgTable(
     /** The day it goes out. Set exactly when the joke is scheduled or delivered. */
     deliverOn: date("deliver_on", { mode: "string" }),
     submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+    /** The curator who last scheduled or declined it. */
+    reviewedBy: uuid("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    declineReason: declineReasonEnum("decline_reason"),
+    declineNote: text("decline_note"),
     updatedAt: updatedAt(),
   },
   (t) => [
@@ -210,17 +224,25 @@ export const jokes = pgTable(
     uniqueIndex("jokes_one_per_day_key")
       .on(t.deliverOn, sql`coalesce(${t.region}, '')`)
       .where(sql`${t.deliverOn} is not null`),
+    /** Trigram index behind possible-copy detection (needs the pg_trgm extension). */
+    index("jokes_text_trgm_idx").using("gin", sql`${jokeText(t)} gin_trgm_ops`),
     check(
       "jokes_content",
       sql`(${t.kind} = 'text' and ${t.setup} is not null and ${t.punchline} is not null)
         or (${t.kind} = 'image' and ${t.imageUrl} is not null and ${t.imageAlt} is not null)`,
     ),
+    check("jokes_declined_has_reason", sql`(${t.status} = 'declined') = (${t.declineReason} is not null)`),
     check(
       "jokes_scheduled_has_day",
       sql`(${t.deliverOn} is not null) = (${t.status} in ('scheduled', 'delivered'))`,
     ),
   ],
 );
+
+/** The searchable text of a joke: setup and punchline, lowercased. */
+export function jokeText(t: { setup: unknown; punchline: unknown }) {
+  return sql`(lower(coalesce(${t.setup}, '') || ' ' || coalesce(${t.punchline}, '')))`;
+}
 
 export const jokeTopics = pgTable(
   "joke_topics",
@@ -240,3 +262,4 @@ export type Tone = (typeof toneEnum.enumValues)[number];
 export type User = typeof users.$inferSelect;
 export type Joke = typeof jokes.$inferSelect;
 export type JokeStatus = (typeof jokeStatusEnum.enumValues)[number];
+export type DeclineReason = (typeof declineReasonEnum.enumValues)[number];

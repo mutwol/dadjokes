@@ -1,4 +1,4 @@
-import type { Creator, Joke, Submission } from "./types.ts";
+import type { Creator, Joke } from "./types.ts";
 
 /**
  * Mock data for the UI prototype. The shape mirrors what an API would return,
@@ -178,36 +178,6 @@ export const jokes: Joke[] = [
 /** Days of the current week that the reader opened their joke. */
 export const seenDays = new Set(["2026-10-12", "2026-10-14", "2026-10-15"]);
 
-export const mySubmissions: Submission[] = [
-  {
-    id: "s1",
-    setup: "I'm reading a book about anti-gravity.",
-    punchline: "It's impossible to put down.",
-    background: "denim",
-    submittedOn: "2026-10-14",
-    status: "scheduled",
-    scheduledFor: "2026-10-21",
-  },
-  {
-    id: "s2",
-    setup: "Why did the matatu bring a sweater?",
-    punchline: "It heard the route had a lot of drafts.",
-    background: "green",
-    submittedOn: "2026-10-15",
-    status: "in-review",
-  },
-  {
-    id: "s3",
-    setup: "What do you call a fake noodle?",
-    punchline: "An impasta.",
-    background: "yellow",
-    submittedOn: "2026-10-02",
-    status: "delivered",
-    scheduledFor: "2026-10-08",
-    deliveredTo: 41200,
-  },
-];
-
 export function creatorById(id: string): Creator {
   const c = creators.find((x) => x.id === id);
   if (!c) throw new Error(`Unknown creator ${id}`);
@@ -220,28 +190,4 @@ export function jokeById(id: string): Joke | undefined {
 
 export function jokeForDay(day: string): Joke | undefined {
   return jokes.find((j) => j.deliverOn === day);
-}
-
-/** Monday-to-Sunday dates (ISO) for the week containing `day`. */
-export function weekOf(day: string): string[] {
-  const d = new Date(`${day}T12:00:00`);
-  const monday = new Date(d);
-  monday.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-  return Array.from({ length: 7 }, (_, i) => {
-    const x = new Date(monday);
-    x.setDate(monday.getDate() + i);
-    return x.toISOString().slice(0, 10);
-  });
-}
-
-export function weekdayShort(day: string): string {
-  return new Date(`${day}T12:00:00`).toLocaleDateString("en-GB", { weekday: "short" });
-}
-
-export function longDate(day: string): string {
-  return new Date(`${day}T12:00:00`).toLocaleDateString("en-GB", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
 }

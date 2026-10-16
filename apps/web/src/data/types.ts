@@ -50,19 +50,6 @@ export interface ImageJoke extends JokeBase {
 
 export type Joke = TextJoke | ImageJoke;
 
-export type SubmissionStatus = "in-review" | "scheduled" | "delivered" | "declined";
-
-export interface Submission {
-  id: string;
-  setup: string;
-  punchline: string;
-  background: JokeBackground;
-  submittedOn: string;
-  status: SubmissionStatus;
-  scheduledFor?: string;
-  deliveredTo?: number;
-}
-
 /** A person can read (get the daily joke), write (submit jokes), or both. */
 export type Role = "reader" | "writer";
 

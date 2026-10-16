@@ -140,3 +140,8 @@
     padding-top: 40px;
   }
 }
+
+.profile-note {
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+}

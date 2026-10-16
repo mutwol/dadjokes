@@ -3,6 +3,7 @@ import { and, asc, eq, inArray, ne, notInArray } from "drizzle-orm";
 import { z } from "zod";
 import { AppError, notFound } from "../common/errors";
 import { CreatorsService } from "../creators/creators.service";
+import { assertTopicsExist } from "../db/topics";
 import { InjectDb } from "../db/db.module";
 import type { Db, Tx } from "../db/db.module";
 import { payoutMethods, topics, userPreferences, userRoles, users, userTopics } from "../db/schema";
@@ -112,7 +113,7 @@ export class UsersService {
     }
     if (topicSlugs) {
       const unique = [...new Set(topicSlugs)];
-      await this.assertTopicsExist(unique, tx);
+      await assertTopicsExist(tx, unique);
       await tx.delete(userTopics).where(eq(userTopics.userId, userId));
       if (unique.length) await tx.insert(userTopics).values(unique.map((topicSlug) => ({ userId, topicSlug })));
     }
@@ -188,16 +189,5 @@ export class UsersService {
 
   private async assertHandleFree(handle: string, userId: string, tx: Tx) {
     if (RESERVED_HANDLES.has(handle) || (await this.isTaken(handle, userId, tx))) throw handleTaken(handle);
-  }
-
-  private async assertTopicsExist(slugs: string[], tx: Tx) {
-    if (!slugs.length) return;
-    const found = await tx.select({ slug: topics.slug }).from(topics).where(inArray(topics.slug, slugs));
-    const missing = slugs.filter((s) => !found.some((f) => f.slug === s));
-    if (missing.length) {
-      throw new AppError(422, "unknown_topic", "Some topics don't exist.", {
-        errors: missing.map((m) => ({ path: "topics", message: `Unknown topic: ${m}` })),
-      });
-    }
   }
 }

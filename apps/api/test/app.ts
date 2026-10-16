@@ -74,3 +74,22 @@ export const onboardingBody = (overrides: Record<string, unknown> = {}) => ({
   deliveryHour: 7,
   ...overrides,
 });
+
+/** Signs up and onboards someone, optionally with extra staff roles. Returns their auth header. */
+export async function signUp(
+  t: TestApp,
+  email: string,
+  opts: { roles?: ("reader" | "writer")[]; staff?: ("curator" | "admin")[]; handle?: string } = {},
+) {
+  const { token, user } = await signIn(t, email);
+  const auth = { Authorization: `Bearer ${token}` };
+  await t.http
+    .post("/v1/me/onboarding")
+    .set(auth)
+    .send(onboardingBody({ roles: opts.roles ?? ["reader"], handle: opts.handle ?? email.split("@")[0].replace(/\W/g, "_").slice(0, 20) }))
+    .expect(200);
+  for (const role of opts.staff ?? []) {
+    await t.db.execute(sql`insert into user_roles (user_id, role) values (${user.id}, ${role}) on conflict do nothing`);
+  }
+  return { auth, userId: user.id as string };
+}

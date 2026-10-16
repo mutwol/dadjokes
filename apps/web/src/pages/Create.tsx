@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { useNavigate } from "react-router";
+import { ApiError, api, errorMessage, unwrap } from "../api/client.ts";
+import type { Topic } from "../api/client.ts";
 import { Icon } from "../components/Icon.tsx";
 import { StoryCard } from "../components/StoryCard.tsx";
 import type { JokeBackground } from "../data/types.ts";
@@ -23,14 +25,16 @@ const REGIONS = [
   "United Kingdom",
   "United States",
 ];
-const TAGS = ["Wordplay", "Food", "School", "Work", "Animals", "Kids", "Science", "Sports"];
 
 const SETUP_MAX = 140;
 const PUNCH_MAX = 80;
 
 export function Create() {
   const navigate = useNavigate();
-  const { submit, showToast } = useStore();
+  const { showToast } = useStore();
+  const [topicList, setTopicList] = useState<Topic[]>([]);
+  const [sending, setSending] = useState(false);
+  const [serverError, setServerError] = useState("");
   const [kind, setKind] = useState<"text" | "image">("text");
   const [setup, setSetup] = useState("");
   const [punchline, setPunchline] = useState("");
@@ -41,6 +45,16 @@ export function Create() {
   const [tags, setTags] = useState<string[]>([]);
   const [original, setOriginal] = useState(false);
   const [showPunch, setShowPunch] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api.GET("/v1/topics").then(({ data }) => {
+      if (!cancelled) setTopicList(data?.data ?? []);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(
     () => () => {
@@ -63,16 +77,36 @@ export function Create() {
       prev.includes(t) ? prev.filter((x) => x !== t) : prev.length < 3 ? [...prev, t] : prev,
     );
 
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!ready) return;
-    submit({
-      setup: kind === "text" ? setup.trim() : caption.trim() || "Image joke",
-      punchline: kind === "text" ? punchline.trim() : "",
-      background,
-    });
-    showToast("Submitted for curation");
-    void navigate("/studio");
+    if (!ready || sending) return;
+    if (kind === "image") {
+      setServerError("Image jokes aren't open yet. Send a setup and punchline for now.");
+      return;
+    }
+    setSending(true);
+    setServerError("");
+    try {
+      unwrap(
+        await api.POST("/v1/me/jokes", {
+          body: {
+            kind: "text",
+            setup: setup.trim(),
+            punchline: punchline.trim(),
+            background,
+            region: region === "Everywhere" ? null : region,
+            topics: tags,
+            original: true,
+          },
+        }),
+      );
+      showToast("Sent to the curators");
+      void navigate("/studio");
+    } catch (err) {
+      const fields = err instanceof ApiError ? Object.values(err.fieldErrors()) : [];
+      setServerError(fields.length ? fields.join(" ") : errorMessage(err));
+      setSending(false);
+    }
   };
 
   const missing = !hasContent
@@ -84,7 +118,7 @@ export function Create() {
       : "";
 
   return (
-    <form className="create" onSubmit={onSubmit} aria-labelledby="create-title">
+    <form className="create" onSubmit={(e) => void onSubmit(e)} aria-labelledby="create-title">
       <header className="create-head">
         <button
           type="button"
@@ -230,16 +264,16 @@ export function Create() {
           <fieldset className="field">
             <legend className="field-legend">Topics (up to 3)</legend>
             <div className="chips">
-              {TAGS.map((t) => (
+              {topicList.map((t) => (
                 <button
-                  key={t}
+                  key={t.slug}
                   type="button"
-                  className={`chip${tags.includes(t) ? " is-on" : ""}`}
-                  aria-pressed={tags.includes(t)}
-                  onClick={() => toggleTag(t)}
-                  disabled={!tags.includes(t) && tags.length >= 3}
+                  className={`chip${tags.includes(t.slug) ? " is-on" : ""}`}
+                  aria-pressed={tags.includes(t.slug)}
+                  onClick={() => toggleTag(t.slug)}
+                  disabled={!tags.includes(t.slug) && tags.length >= 3}
                 >
-                  {t}
+                  {t.label}
                 </button>
               ))}
             </div>
@@ -263,13 +297,17 @@ export function Create() {
             <button
               type="submit"
               className="btn btn-primary btn-block"
-              disabled={!ready}
+              disabled={!ready || sending}
               aria-describedby="submit-hint"
             >
-              Submit for curation
+              {sending ? "Sending…" : "Submit for curation"}
             </button>
-            <p id="submit-hint" className="field-help" aria-live="polite">
-              {missing}
+            <p
+              id="submit-hint"
+              className={serverError ? "field-help field-error" : "field-help"}
+              aria-live="polite"
+            >
+              {serverError || missing}
             </p>
           </div>
         </div>

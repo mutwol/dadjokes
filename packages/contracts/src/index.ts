@@ -13,6 +13,13 @@ export type Topic = Schemas["Topic"];
 export type HandleAvailability = Schemas["HandleAvailability"];
 export type CompleteOnboardingRequest = Schemas["CompleteOnboardingRequest"];
 export type Problem = Schemas["Problem"];
+export type Submission = Schemas["Submission"];
+export type SubmissionPage = Schemas["SubmissionPage"];
+export type CreateJokeRequest = Schemas["CreateJokeRequest"];
+export type CuratedJoke = Schemas["CuratedJoke"];
+export type QueueItem = Schemas["QueueItem"];
+export type PossibleCopy = Schemas["PossibleCopy"];
+export type CurationCalendar = Schemas["CurationCalendar"];
 
 /** Error thrown by `unwrap` for any non-2xx response. */
 export class ApiError extends Error {

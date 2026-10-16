@@ -12,12 +12,10 @@ import {
   TODAY,
   creatorById,
   jokeForDay,
-  longDate,
-  weekOf,
-  weekdayShort,
 } from "../data/mock.ts";
 import { REACTIONS, compact, groanScore } from "../data/reactions.ts";
 import type { Joke } from "../data/types.ts";
+import { longDate, weekOf, weekdayShort } from "../data/dates.ts";
 import { useStore } from "../state/useStore.ts";
 import "./Today.css";
 

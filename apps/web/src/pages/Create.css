@@ -230,3 +230,8 @@
     bottom: 0;
   }
 }
+
+.field-error {
+  color: var(--tag-red);
+  font-weight: 700;
+}

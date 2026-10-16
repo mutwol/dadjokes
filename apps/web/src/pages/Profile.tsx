@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { api } from "../api/client.ts";
 import type { Creator } from "../api/client.ts";
 import { Avatar } from "../components/Avatar.tsx";
@@ -176,6 +176,16 @@ export function Profile() {
               </dd>
             </div>
           </dl>
+        </section>
+      ) : null}
+
+      {hasRole("curator") || hasRole("admin") ? (
+        <section className="profile-section" aria-labelledby="curation-title">
+          <h2 id="curation-title">Curation</h2>
+          <p className="profile-note">You can review submissions and pick the daily joke.</p>
+          <Link to="/curate" className="btn btn-quiet">
+            Open the review queue
+          </Link>
         </section>
       ) : null}
 

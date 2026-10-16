@@ -12,3 +12,6 @@ coverage
 .idea
 .vscode/*
 !.vscode/extensions.json
+
+# Redis snapshots from local runs
+*.rdb

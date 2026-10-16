@@ -197,6 +197,143 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/jokes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My jokes, newest first */
+        get: operations["listMyJokes"];
+        put?: never;
+        /** Send a joke to the curators */
+        post: operations["submitJoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/jokes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One of my jokes */
+        get: operations["getMyJoke"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/jokes/{id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Withdraw a joke from review, or from the schedule before its day starts. Safe to repeat. */
+        post: operations["withdrawMyJoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/curation/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Jokes waiting for review, oldest first */
+        get: operations["getReviewQueue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/curation/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Which days already have a joke */
+        get: operations["getCurationCalendar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/curation/jokes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Any joke, as curators see it */
+        get: operations["getCuratedJoke"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/curation/jokes/{id}/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pick a joke for a day, or move it to another day */
+        post: operations["scheduleJoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/curation/jokes/{id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Don't pick a joke, with a reason for the writer */
+        post: operations["declineJoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/email/start": {
         parameters: {
             query?: never;
@@ -427,6 +564,140 @@ export interface components {
         AccessToken: {
             accessToken: string;
             expiresInSeconds: number;
+        };
+        CreateJokeRequest: {
+            /** @enum {string} */
+            kind: "text";
+            setup: string;
+            punchline: string;
+            /**
+             * @default red
+             * @enum {string}
+             */
+            background?: "red" | "navy" | "yellow" | "green" | "denim";
+            /**
+             * @description Country whose readers need local knowledge to get it. Null: works everywhere.
+             * @default null
+             */
+            region?: string | null;
+            /** @default [] */
+            topics?: string[];
+            /** @enum {boolean} */
+            original: true;
+        };
+        Submission: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "text" | "image";
+            setup: string | null;
+            punchline: string | null;
+            imageUrl: string | null;
+            imageAlt: string | null;
+            caption: string | null;
+            /** @enum {string} */
+            background: "red" | "navy" | "yellow" | "green" | "denim";
+            region: string | null;
+            topics: string[];
+            /** @enum {string} */
+            status: "in_review" | "scheduled" | "delivered" | "declined" | "withdrawn";
+            /** Format: date */
+            deliverOn: string | null;
+            /** Format: date-time */
+            submittedAt: string;
+            /** @enum {string|null} */
+            declineReason: "possible_copy" | "not_a_dad_joke" | "offensive" | "unclear" | "other" | null;
+            declineNote: string | null;
+            canWithdraw: boolean;
+        };
+        SubmissionPage: {
+            data: components["schemas"]["Submission"][];
+            nextCursor: string | null;
+        };
+        JokeCreator: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            handle: string;
+            country: string | null;
+            /** @enum {string} */
+            tone: "red" | "navy" | "yellow" | "green" | "denim";
+        };
+        CuratedJoke: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "text" | "image";
+            setup: string | null;
+            punchline: string | null;
+            imageUrl: string | null;
+            imageAlt: string | null;
+            caption: string | null;
+            /** @enum {string} */
+            background: "red" | "navy" | "yellow" | "green" | "denim";
+            region: string | null;
+            topics: string[];
+            /** @enum {string} */
+            status: "in_review" | "scheduled" | "delivered" | "declined" | "withdrawn";
+            /** Format: date */
+            deliverOn: string | null;
+            /** Format: date-time */
+            submittedAt: string;
+            /** @enum {string|null} */
+            declineReason: "possible_copy" | "not_a_dad_joke" | "offensive" | "unclear" | "other" | null;
+            declineNote: string | null;
+            canWithdraw: boolean;
+            creator: components["schemas"]["JokeCreator"];
+            /** Format: date-time */
+            reviewedAt: string | null;
+        };
+        PossibleCopy: {
+            /** Format: uuid */
+            id: string;
+            setup: string | null;
+            punchline: string | null;
+            /** @enum {string} */
+            status: "in_review" | "scheduled" | "delivered" | "declined" | "withdrawn";
+            /** Format: date */
+            deliverOn: string | null;
+            creatorHandle: string;
+            sameWriter: boolean;
+            similarity: number;
+        };
+        QueueItem: {
+            joke: components["schemas"]["CuratedJoke"];
+            possibleCopies: components["schemas"]["PossibleCopy"][];
+        };
+        QueuePage: {
+            data: components["schemas"]["QueueItem"][];
+            nextCursor: string | null;
+            waiting: number;
+        };
+        CurationCalendar: {
+            /** Format: date */
+            firstOpenDay: string;
+            days: {
+                /** Format: date */
+                date: string;
+                picks: {
+                    /** Format: uuid */
+                    jokeId: string;
+                    region: string | null;
+                    setup: string | null;
+                    creatorName: string;
+                    /** @enum {string} */
+                    status: "in_review" | "scheduled" | "delivered" | "declined" | "withdrawn";
+                }[];
+            }[];
+        };
+        ScheduleJokeRequest: {
+            /** Format: date */
+            deliverOn: string;
+        };
+        DeclineJokeRequest: {
+            /** @enum {string} */
+            reason: "possible_copy" | "not_a_dad_joke" | "offensive" | "unclear" | "other";
+            note?: string;
         };
     };
     responses: never;
@@ -822,6 +1093,281 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    listMyJokes: {
+        parameters: {
+            query?: {
+                status?: "in_review" | "scheduled" | "delivered" | "declined" | "withdrawn";
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionPage"];
+                };
+            };
+        };
+    };
+    submitJoke: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateJokeRequest"];
+            };
+        };
+        responses: {
+            /** @description Submitted for review */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Submission"];
+                };
+            };
+            /** @description Already sent this joke */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not valid, or too many jokes waiting for review */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getMyJoke: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Submission"];
+                };
+            };
+            /** @description Not one of my jokes */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    withdrawMyJoke: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Submission"];
+                };
+            };
+            /** @description Already going out */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getReviewQueue: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueuePage"];
+                };
+            };
+        };
+    };
+    getCurationCalendar: {
+        parameters: {
+            query?: {
+                from?: string;
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurationCalendar"];
+                };
+            };
+        };
+    };
+    getCuratedJoke: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CuratedJoke"];
+                };
+            };
+        };
+    };
+    scheduleJoke: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleJokeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CuratedJoke"];
+                };
+            };
+            /** @description The day is taken, or the joke can't be scheduled */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The day has already started somewhere */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    declineJoke: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeclineJokeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CuratedJoke"];
+                };
+            };
+            /** @description Already going out */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
             };
         };
     };

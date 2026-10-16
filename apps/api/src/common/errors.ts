@@ -30,6 +30,7 @@ export type Problem = z.infer<typeof ProblemSchema>;
 /** Unique constraints that map to a specific, user-facing conflict. */
 const UNIQUE_CONSTRAINTS: Record<string, [string, string]> = {
   users_handle_key: ["handle_taken", "That username is taken."],
+  jokes_one_per_day_key: ["day_taken", "Another joke is already going out that day."],
 };
 
 const STATUS_CODES: Record<number, [string, string]> = {

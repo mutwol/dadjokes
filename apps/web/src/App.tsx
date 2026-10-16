@@ -1,7 +1,8 @@
 import { createBrowserRouter, RouterProvider } from "react-router";
 import { AppShell } from "./components/AppShell.tsx";
-import { RequireProfile, RequireWriter } from "./components/RoleGate.tsx";
+import { RequireCurator, RequireProfile, RequireWriter } from "./components/RoleGate.tsx";
 import { Create } from "./pages/Create.tsx";
+import { Curate } from "./pages/Curate.tsx";
 import { JokeDetail } from "./pages/JokeDetail.tsx";
 import { OnboardingLayout } from "./pages/onboarding/OnboardingLayout.tsx";
 import {
@@ -72,6 +73,14 @@ const router = createBrowserRouter([
           <RequireWriter>
             <Studio />
           </RequireWriter>
+        ),
+      },
+      {
+        path: "curate",
+        element: (
+          <RequireCurator>
+            <Curate />
+          </RequireCurator>
         ),
       },
       {

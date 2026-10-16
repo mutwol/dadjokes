@@ -1,0 +1,230 @@
+.curate {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 0 16px 32px;
+  display: grid;
+  gap: 20px;
+}
+
+.curate-head {
+  padding-top: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.curate-head h1 {
+  font-size: var(--step-3);
+}
+
+.curate-head p,
+.cal-head p,
+.qcard-muted {
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+}
+
+.cal {
+  display: grid;
+  gap: 10px;
+}
+
+.cal-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.cal-head h2 {
+  font-size: var(--step-1);
+}
+
+.cal-days {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 6px;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.cal-day {
+  position: relative;
+  flex: 0 0 46px;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 8px 0;
+  border: 1.5px dashed var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+}
+
+.cal-day.is-filled {
+  border-style: solid;
+  border-color: var(--denim);
+  background: #dde7fb;
+}
+
+.cal-dow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.cal-num {
+  font-weight: 800;
+}
+
+.cal-regional {
+  position: absolute;
+  top: -7px;
+  right: -5px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--tag-red);
+  color: #fff;
+}
+
+.curate-empty {
+  padding: 20px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-m);
+  color: var(--ink-soft);
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.curate-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.qcard {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.qcard-joke {
+  display: flex;
+  gap: 14px;
+}
+
+.qcard-thumb {
+  width: 84px;
+  flex-shrink: 0;
+}
+
+.qcard-thumb .story-card {
+  border-radius: 10px;
+}
+
+.qcard-thumb .story-setup {
+  font-size: 8px;
+}
+
+.qcard-thumb .story-punchline {
+  font-size: 8.5px;
+}
+
+.qcard-text {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  min-width: 0;
+}
+
+.qcard-setup {
+  font-weight: 800;
+}
+
+.qcard-punch {
+  font-weight: 600;
+}
+
+.qcard-by {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--step--1);
+  font-weight: 700;
+}
+
+.qcard-copies {
+  background: #fff1b8;
+  color: #4d3b00;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: var(--step--1);
+  display: grid;
+  gap: 6px;
+}
+
+.qcard-copies .qcard-muted {
+  color: #6b5200;
+}
+
+.qcard-copies-title {
+  font-weight: 800;
+}
+
+.qcard-copies ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.qcard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.qcard-field {
+  display: grid;
+  gap: 4px;
+  font-size: var(--step--1);
+  font-weight: 700;
+}
+
+.qcard-grow {
+  flex: 1 1 200px;
+}
+
+.qcard-field input,
+.qcard-field select {
+  font: inherit;
+  font-weight: 600;
+  padding: 8px 10px;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  min-height: 40px;
+}
+
+.qcard-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.qcard-error {
+  color: var(--tag-red);
+  font-weight: 700;
+  font-size: var(--step--1);
+}

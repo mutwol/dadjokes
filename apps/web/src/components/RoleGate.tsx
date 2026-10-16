@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { Navigate } from "react-router";
+import { Link, Navigate } from "react-router";
 import { useStore } from "../state/useStore.ts";
 import { NameTag } from "./NameTag.tsx";
 
@@ -48,6 +48,21 @@ export function RequireWriter({ children }: { children: ReactNode }) {
         {busy ? "Turning on…" : "Start writing"}
       </button>
       <p className="gate-note">You can turn this off in your profile.</p>
+    </div>
+  );
+}
+
+/** Curation is for staff. Everyone else gets a short explanation, not the queue. */
+export function RequireCurator({ children }: { children: ReactNode }) {
+  const { hasRole } = useStore();
+  if (hasRole("curator") || hasRole("admin")) return children;
+  return (
+    <div className="gate">
+      <h1>Curators only</h1>
+      <p>This is where the daily joke gets picked. Ask an admin if you should have access.</p>
+      <Link to="/" className="btn btn-quiet">
+        Back to today
+      </Link>
     </div>
   );
 }

@@ -568,6 +568,472 @@
         ]
       }
     },
+    "/v1/me/jokes": {
+      "post": {
+        "operationId": "submitJoke",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateJokeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Submitted for review",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Submission"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already sent this joke",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Not valid, or too many jokes waiting for review",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Send a joke to the curators",
+        "tags": [
+          "my jokes"
+        ]
+      },
+      "get": {
+        "operationId": "listMyJokes",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "in_review",
+                "scheduled",
+                "delivered",
+                "declined",
+                "withdrawn"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "My jokes, newest first",
+        "tags": [
+          "my jokes"
+        ]
+      }
+    },
+    "/v1/me/jokes/{id}": {
+      "get": {
+        "operationId": "getMyJoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Submission"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not one of my jokes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One of my jokes",
+        "tags": [
+          "my jokes"
+        ]
+      }
+    },
+    "/v1/me/jokes/{id}/withdraw": {
+      "post": {
+        "operationId": "withdrawMyJoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Submission"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already going out",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Withdraw a joke from review, or from the schedule before its day starts. Safe to repeat.",
+        "tags": [
+          "my jokes"
+        ]
+      }
+    },
+    "/v1/curation/queue": {
+      "get": {
+        "operationId": "getReviewQueue",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueuePage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Jokes waiting for review, oldest first",
+        "tags": [
+          "curation"
+        ]
+      }
+    },
+    "/v1/curation/calendar": {
+      "get": {
+        "operationId": "getCurationCalendar",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "description": "First day to show. Defaults to the first day still open for scheduling.",
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            }
+          },
+          {
+            "name": "days",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 21,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 62
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurationCalendar"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Which days already have a joke",
+        "tags": [
+          "curation"
+        ]
+      }
+    },
+    "/v1/curation/jokes/{id}": {
+      "get": {
+        "operationId": "getCuratedJoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CuratedJoke"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Any joke, as curators see it",
+        "tags": [
+          "curation"
+        ]
+      }
+    },
+    "/v1/curation/jokes/{id}/schedule": {
+      "post": {
+        "operationId": "scheduleJoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleJokeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CuratedJoke"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The day is taken, or the joke can't be scheduled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The day has already started somewhere",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pick a joke for a day, or move it to another day",
+        "tags": [
+          "curation"
+        ]
+      }
+    },
+    "/v1/curation/jokes/{id}/decline": {
+      "post": {
+        "operationId": "declineJoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeclineJokeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CuratedJoke"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already going out",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Don't pick a joke, with a reason for the writer",
+        "tags": [
+          "curation"
+        ]
+      }
+    },
     "/v1/auth/email/start": {
       "post": {
         "operationId": "startEmailSignIn",
@@ -1382,6 +1848,570 @@
         "required": [
           "accessToken",
           "expiresInSeconds"
+        ]
+      },
+      "CreateJokeRequest": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "text"
+                ]
+              },
+              "setup": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 140
+              },
+              "punchline": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "background": {
+                "default": "red",
+                "type": "string",
+                "enum": [
+                  "red",
+                  "navy",
+                  "yellow",
+                  "green",
+                  "denim"
+                ]
+              },
+              "region": {
+                "default": null,
+                "description": "Country whose readers need local knowledge to get it. Null: works everywhere.",
+                "nullable": true,
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 56
+              },
+              "topics": {
+                "default": [],
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "original": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "setup",
+              "punchline",
+              "original"
+            ]
+          }
+        ]
+      },
+      "Submission": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "text",
+              "image"
+            ]
+          },
+          "setup": {
+            "nullable": true,
+            "type": "string"
+          },
+          "punchline": {
+            "nullable": true,
+            "type": "string"
+          },
+          "imageUrl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "imageAlt": {
+            "nullable": true,
+            "type": "string"
+          },
+          "caption": {
+            "nullable": true,
+            "type": "string"
+          },
+          "background": {
+            "type": "string",
+            "enum": [
+              "red",
+              "navy",
+              "yellow",
+              "green",
+              "denim"
+            ]
+          },
+          "region": {
+            "nullable": true,
+            "type": "string"
+          },
+          "topics": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "in_review",
+              "scheduled",
+              "delivered",
+              "declined",
+              "withdrawn"
+            ]
+          },
+          "deliverOn": {
+            "nullable": true,
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "declineReason": {
+            "nullable": true,
+            "type": "string",
+            "enum": [
+              "possible_copy",
+              "not_a_dad_joke",
+              "offensive",
+              "unclear",
+              "other"
+            ]
+          },
+          "declineNote": {
+            "nullable": true,
+            "type": "string"
+          },
+          "canWithdraw": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "setup",
+          "punchline",
+          "imageUrl",
+          "imageAlt",
+          "caption",
+          "background",
+          "region",
+          "topics",
+          "status",
+          "deliverOn",
+          "submittedAt",
+          "declineReason",
+          "declineNote",
+          "canWithdraw"
+        ]
+      },
+      "SubmissionPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Submission"
+            }
+          },
+          "nextCursor": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "JokeCreator": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "handle": {
+            "type": "string"
+          },
+          "country": {
+            "nullable": true,
+            "type": "string"
+          },
+          "tone": {
+            "type": "string",
+            "enum": [
+              "red",
+              "navy",
+              "yellow",
+              "green",
+              "denim"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "handle",
+          "country",
+          "tone"
+        ]
+      },
+      "CuratedJoke": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "text",
+              "image"
+            ]
+          },
+          "setup": {
+            "nullable": true,
+            "type": "string"
+          },
+          "punchline": {
+            "nullable": true,
+            "type": "string"
+          },
+          "imageUrl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "imageAlt": {
+            "nullable": true,
+            "type": "string"
+          },
+          "caption": {
+            "nullable": true,
+            "type": "string"
+          },
+          "background": {
+            "type": "string",
+            "enum": [
+              "red",
+              "navy",
+              "yellow",
+              "green",
+              "denim"
+            ]
+          },
+          "region": {
+            "nullable": true,
+            "type": "string"
+          },
+          "topics": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "in_review",
+              "scheduled",
+              "delivered",
+              "declined",
+              "withdrawn"
+            ]
+          },
+          "deliverOn": {
+            "nullable": true,
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "declineReason": {
+            "nullable": true,
+            "type": "string",
+            "enum": [
+              "possible_copy",
+              "not_a_dad_joke",
+              "offensive",
+              "unclear",
+              "other"
+            ]
+          },
+          "declineNote": {
+            "nullable": true,
+            "type": "string"
+          },
+          "canWithdraw": {
+            "type": "boolean"
+          },
+          "creator": {
+            "$ref": "#/components/schemas/JokeCreator"
+          },
+          "reviewedAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "setup",
+          "punchline",
+          "imageUrl",
+          "imageAlt",
+          "caption",
+          "background",
+          "region",
+          "topics",
+          "status",
+          "deliverOn",
+          "submittedAt",
+          "declineReason",
+          "declineNote",
+          "canWithdraw",
+          "creator",
+          "reviewedAt"
+        ]
+      },
+      "PossibleCopy": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "setup": {
+            "nullable": true,
+            "type": "string"
+          },
+          "punchline": {
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "in_review",
+              "scheduled",
+              "delivered",
+              "declined",
+              "withdrawn"
+            ]
+          },
+          "deliverOn": {
+            "nullable": true,
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "creatorHandle": {
+            "type": "string"
+          },
+          "sameWriter": {
+            "type": "boolean"
+          },
+          "similarity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": [
+          "id",
+          "setup",
+          "punchline",
+          "status",
+          "deliverOn",
+          "creatorHandle",
+          "sameWriter",
+          "similarity"
+        ]
+      },
+      "QueueItem": {
+        "type": "object",
+        "properties": {
+          "joke": {
+            "$ref": "#/components/schemas/CuratedJoke"
+          },
+          "possibleCopies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PossibleCopy"
+            }
+          }
+        },
+        "required": [
+          "joke",
+          "possibleCopies"
+        ]
+      },
+      "QueuePage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueueItem"
+            }
+          },
+          "nextCursor": {
+            "nullable": true,
+            "type": "string"
+          },
+          "waiting": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor",
+          "waiting"
+        ]
+      },
+      "CurationCalendar": {
+        "type": "object",
+        "properties": {
+          "firstOpenDay": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "picks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "jokeId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "region": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "setup": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "creatorName": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "in_review",
+                          "scheduled",
+                          "delivered",
+                          "declined",
+                          "withdrawn"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "jokeId",
+                      "region",
+                      "setup",
+                      "creatorName",
+                      "status"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "date",
+                "picks"
+              ]
+            }
+          }
+        },
+        "required": [
+          "firstOpenDay",
+          "days"
+        ]
+      },
+      "ScheduleJokeRequest": {
+        "type": "object",
+        "properties": {
+          "deliverOn": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          }
+        },
+        "required": [
+          "deliverOn"
+        ]
+      },
+      "DeclineJokeRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": [
+              "possible_copy",
+              "not_a_dad_joke",
+              "offensive",
+              "unclear",
+              "other"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 280
+          }
+        },
+        "required": [
+          "reason"
         ]
       }
     }
