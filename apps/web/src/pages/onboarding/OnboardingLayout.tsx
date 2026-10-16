@@ -4,7 +4,7 @@ import { ApiError, api, errorMessage, unwrap } from "../../api/client.ts";
 import { Icon } from "../../components/Icon.tsx";
 import { NameTag } from "../../components/NameTag.tsx";
 import { StoryCard } from "../../components/StoryCard.tsx";
-import { jokeForDay, TODAY } from "../../data/mock.ts";
+import { SAMPLE_JOKE } from "../../data/sample.ts";
 import type { OnboardingDraft } from "../../data/types.ts";
 import { useStore } from "../../state/useStore.ts";
 import { browserTimeZone, EMPTY_DRAFT, firstName, SIGN_IN_STEPS, stepsFor } from "./flow.ts";
@@ -90,7 +90,7 @@ export function OnboardingLayout() {
     },
   };
 
-  const sample = jokeForDay(TODAY);
+  const sample = SAMPLE_JOKE;
   const name = firstName(flow.draft.name);
   // Once signed in, going back from the first post-sign-in step makes no sense.
   const backTarget = index > 0 && !(account && steps[index - 1] === "verify") ? `/welcome/${steps[index - 1]}` : null;

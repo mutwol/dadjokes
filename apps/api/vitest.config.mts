@@ -19,6 +19,7 @@ export default defineConfig({
       CODE_SECRET: "test-code-secret-that-is-long-enough-012345678",
       THROTTLE_DISABLED: "true",
       WEB_ORIGIN: "http://localhost:5173",
+      UPLOAD_DIR: process.env.TEST_UPLOAD_DIR ?? "/tmp/daddy-jokes-test-uploads",
     },
   },
 });

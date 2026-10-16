@@ -4,6 +4,7 @@ import { ApiError, api, errorMessage, unwrap } from "../api/client.ts";
 import type { CurationCalendar, QueueItem } from "../api/client.ts";
 import { Avatar } from "../components/Avatar.tsx";
 import { StoryCard } from "../components/StoryCard.tsx";
+import { faceOf } from "../data/face.ts";
 import { longDate, shortDate, weekdayShort } from "../data/dates.ts";
 import { useStore } from "../state/useStore.ts";
 import "./Curate.css";
@@ -203,11 +204,7 @@ function QueueCard({
       <div className="qcard-joke">
         <div className="qcard-thumb">
           <StoryCard
-            face={
-              joke.kind === "text"
-                ? { kind: "text", setup: joke.setup ?? "", punchline: joke.punchline ?? "", background: joke.background }
-                : { kind: "image", imageUrl: joke.imageUrl ?? undefined, imageAlt: joke.imageAlt ?? "", caption: joke.caption ?? "" }
-            }
+            face={faceOf(joke)}
             revealed
             animate={false}
           />

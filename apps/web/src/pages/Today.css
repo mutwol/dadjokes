@@ -385,3 +385,22 @@
   flex: 1;
   font-size: var(--step--1);
 }
+
+.today-skeleton {
+  min-height: 320px;
+  border-radius: var(--radius-l);
+  background: linear-gradient(100deg, var(--fridge) 40%, var(--paper) 50%, var(--fridge) 60%) 0 0 / 300% 100%;
+  animation: today-shimmer 1.4s linear infinite;
+}
+
+@keyframes today-shimmer {
+  to {
+    background-position: -150% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .today-skeleton {
+    animation: none;
+  }
+}

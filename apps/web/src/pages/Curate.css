@@ -228,3 +228,8 @@
   font-weight: 700;
   font-size: var(--step--1);
 }
+
+.qcard-thumb .story-caption {
+  font-size: 8px;
+  padding: 6px;
+}

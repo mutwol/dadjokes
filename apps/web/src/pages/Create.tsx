@@ -26,6 +26,9 @@ const REGIONS = [
   "United States",
 ];
 
+const IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"] as const;
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
 const SETUP_MAX = 140;
 const PUNCH_MAX = 80;
 
@@ -40,6 +43,9 @@ export function Create() {
   const [punchline, setPunchline] = useState("");
   const [background, setBackground] = useState<JokeBackground>("red");
   const [imageUrl, setImageUrl] = useState<string>();
+  const [imageKey, setImageKey] = useState<string>();
+  const [uploading, setUploading] = useState(false);
+  const [imageAlt, setImageAlt] = useState("");
   const [caption, setCaption] = useState("");
   const [region, setRegion] = useState("Everywhere");
   const [tags, setTags] = useState<string[]>([]);
@@ -63,13 +69,42 @@ export function Create() {
     [imageUrl],
   );
 
-  const hasContent = kind === "text" ? setup.trim() && punchline.trim() : Boolean(imageUrl);
+  const hasContent =
+    kind === "text" ? setup.trim() && punchline.trim() : Boolean(imageKey) && imageAlt.trim().length >= 3;
   const ready = Boolean(hasContent) && original;
 
-  const onFile = (e: ChangeEvent<HTMLInputElement>) => {
+  /** Uploads straight to storage as soon as an image is picked, so submitting is instant. */
+  const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
+    if (!IMAGE_TYPES.includes(file.type as (typeof IMAGE_TYPES)[number])) {
+      setServerError("Use a PNG, JPG, GIF or WebP image.");
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      setServerError("That image is over 10 MB. Try a smaller one.");
+      return;
+    }
+    setServerError("");
+    setImageKey(undefined);
     setImageUrl(URL.createObjectURL(file));
+    setUploading(true);
+    try {
+      const target = unwrap(
+        await api.POST("/v1/me/uploads", {
+          body: { contentType: file.type as (typeof IMAGE_TYPES)[number], size: file.size },
+        }),
+      );
+      const put = await fetch(target.url, { method: "PUT", headers: target.headers, body: file });
+      if (!put.ok) throw new Error(`Upload failed (${put.status})`);
+      setImageKey(target.key);
+    } catch (err) {
+      setImageUrl(undefined);
+      setServerError(err instanceof ApiError ? err.problem.title : "The upload didn't work. Try again.");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const toggleTag = (t: string) =>
@@ -80,24 +115,16 @@ export function Create() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!ready || sending) return;
-    if (kind === "image") {
-      setServerError("Image jokes aren't open yet. Send a setup and punchline for now.");
-      return;
-    }
     setSending(true);
     setServerError("");
+    const common = { region: region === "Everywhere" ? null : region, topics: tags, original: true as const };
     try {
       unwrap(
         await api.POST("/v1/me/jokes", {
-          body: {
-            kind: "text",
-            setup: setup.trim(),
-            punchline: punchline.trim(),
-            background,
-            region: region === "Everywhere" ? null : region,
-            topics: tags,
-            original: true,
-          },
+          body:
+            kind === "text"
+              ? { kind: "text", setup: setup.trim(), punchline: punchline.trim(), background, ...common }
+              : { kind: "image", imageKey: imageKey!, imageAlt: imageAlt.trim(), caption: caption.trim() || undefined, ...common },
         }),
       );
       showToast("Sent to the curators");
@@ -112,7 +139,11 @@ export function Create() {
   const missing = !hasContent
     ? kind === "text"
       ? "Add a setup and a punchline to submit."
-      : "Add an image to submit."
+      : uploading
+        ? "Uploading the image…"
+        : imageKey
+          ? "Describe the image to submit."
+          : "Add an image to submit."
     : !original
       ? "Confirm the joke is your own to submit."
       : "";
@@ -223,14 +254,32 @@ export function Create() {
                 <label className={`dropzone${imageUrl ? " has-image" : ""}`}>
                   <input
                     type="file"
-                    accept="image/*"
-                    onChange={onFile}
+                    accept={IMAGE_TYPES.join(",")}
+                    onChange={(e) => void onFile(e)}
                     className="visually-hidden"
+                    disabled={uploading}
                   />
                   <Icon name="image" size={28} />
-                  <span>{imageUrl ? "Choose a different image" : "Choose an image"}</span>
-                  <span className="field-help">PNG, JPG or GIF, up to 10 MB</span>
+                  <span>
+                    {uploading ? "Uploading…" : imageKey ? "Choose a different image" : "Choose an image"}
+                  </span>
+                  <span className="field-help">PNG, JPG, GIF or WebP, up to 10 MB</span>
                 </label>
+              </div>
+              <div className="field">
+                <div className="field-label">
+                  <label htmlFor="alt">Describe the image</label>
+                  <span className="field-count">{imageAlt.length}/200</span>
+                </div>
+                <input
+                  id="alt"
+                  maxLength={200}
+                  value={imageAlt}
+                  onChange={(e) => setImageAlt(e.target.value)}
+                  placeholder="A dad holding a fish, looking proud"
+                  autoComplete="off"
+                />
+                <p className="field-help">For people who use a screen reader. Required.</p>
               </div>
               <div className="field">
                 <div className="field-label">
@@ -330,7 +379,7 @@ export function Create() {
               face={
                 kind === "text"
                   ? { kind, setup, punchline, background }
-                  : { kind, imageUrl, caption, imageAlt: caption }
+                  : { kind, imageUrl, caption, imageAlt }
               }
               revealed={kind === "image" || showPunch}
               variant="card"

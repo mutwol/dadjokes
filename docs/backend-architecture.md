@@ -42,7 +42,7 @@ packages/contracts     openapi.json + generated types + typed client
 - **Rate limits:** 120 requests/minute by default; stricter on sign-in routes.
 - **Screen-shaped writes:** `POST /v1/me/onboarding` saves everything from onboarding in one transaction, so a half-finished sign-up never leaves partial data.
 
-## Endpoints built (phase 1)
+## Endpoints
 
 | Method | Path | Purpose |
 | --- | --- | --- |
@@ -59,6 +59,16 @@ packages/contracts     openapi.json + generated types + typed client
 | GET | `/v1/topics` | Topics for onboarding |
 | GET | `/v1/creators` · `/v1/creators/{handle}` | Writers, most subscribed first |
 | GET · PUT · DELETE | `/v1/me/subscriptions[/{creatorId}]` | Subscribe to writers |
+| POST · GET | `/v1/me/jokes` | Submit a joke (text or image) · list mine (writers) |
+| GET · POST | `/v1/me/jokes/{id}` · `/{id}/withdraw` | One of mine · withdraw before its day starts |
+| POST | `/v1/me/uploads` | Signed URL to upload a joke image to (writers) |
+| GET | `/v1/me/studio` | Reach, picks and tips for my jokes |
+| GET | `/v1/me/today` | Today's joke (sealed until opened), this week, next delivery, streak |
+| POST | `/v1/me/deliveries/{date}/open` | Open the joke for one of my days ("open once") |
+| GET | `/v1/jokes/{id}` | A joke I've opened (or wrote, or any for curators) |
+| GET | `/v1/curation/queue` | Jokes waiting for review with possible copies (curators) |
+| GET | `/v1/curation/calendar` | Which days have a joke, everywhere and per region |
+| POST | `/v1/curation/jokes/{id}/schedule` · `/decline` | Pick a day · decline with a reason |
 | GET | `/health` | Postgres and Redis status |
 
 Interactive docs run at `http://localhost:3000/docs` in development.
@@ -85,12 +95,22 @@ a day already taken by a real (non-seed) joke is left alone and the test joke go
 
 ## What comes next
 
-**Phase 2: the daily joke**
-- Done: `jokes` (in_review → scheduled → delivered | declined | withdrawn) and `joke_topics`. The database allows one joke per day for everyone and one per day per region, and requires a day exactly when a joke is scheduled or delivered.
-- Image uploads via presigned URLs.
-- `curation`: review queue, possible copies via `pg_trgm`, `daily_picks` per date (global plus regional).
-- `deliveries (user_id, local_date, joke_id, delivered_at, opened_at, expires_at)`, unique on `(user_id, local_date)`. The hourly worker job assigns jokes to readers whose local delivery hour just arrived, then queues push notifications. Retries are safe because of the unique key.
-- `GET /v1/me/today` returns sealed jokes without content; `POST /v1/me/deliveries/{date}/open` returns the joke and records the view, so "open once" is enforced on the server.
+**Phase 2: the daily joke (done)**
+- `jokes` move through in_review → scheduled → delivered, or declined / withdrawn. The database
+  allows one joke per day everywhere plus one per day per region.
+- Curators see possible copies: other jokes with trigram similarity of 0.5 or more (`pg_trgm`).
+- A day can be scheduled only before it has started anywhere on Earth (UTC+14), so nobody
+  misses a joke that was added after their delivery.
+- `deliveries (user_id, local_date, joke_id, delivered_at, expires_at, opened_at)`. The worker runs
+  delivery every 5 minutes: each reader whose local hour has come gets that day's joke (their
+  country's when they chose local jokes), once, thanks to the primary key. Today's screen also
+  delivers on the spot if the job hasn't run yet.
+- A delivered joke is sealed until opened and can be opened for 24 hours; after that it's missed.
+  Opened jokes stay readable.
+- Images upload straight from the browser to storage with a signed PUT URL pinned to the exact
+  type and size. On submit the API checks the file exists, is the writer's own, and that its
+  first bytes match the type. `STORAGE_DRIVER=local` (disk, served at `/media`) or `s3` (S3, R2,
+  MinIO). Orphaned uploads (never submitted) can be cleaned up with a bucket lifecycle rule on `jokes/`.
 
 **Phase 3: engagement and stats**
 - Reactions (one per person per joke), comments, reports, an SSE stream for live counts.

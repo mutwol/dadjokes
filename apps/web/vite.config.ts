@@ -14,6 +14,7 @@ export default defineConfig({
     // Same-origin API in development, so the refresh cookie (scoped to /v1/auth) just works.
     proxy: {
       '/v1': 'http://localhost:3000',
+      '/media': 'http://localhost:3000',
     },
   },
 })

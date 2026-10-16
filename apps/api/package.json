@@ -18,6 +18,8 @@
     "user:role": "tsx --env-file-if-exists=.env src/scripts/set-role.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1152.0",
+    "@aws-sdk/s3-request-presigner": "^3.1152.0",
     "@nestjs/bullmq": "^12.0.0",
     "@nestjs/common": "^12.1.3",
     "@nestjs/config": "^12.0.1",

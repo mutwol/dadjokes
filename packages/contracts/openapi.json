@@ -1,6 +1,53 @@
 {
   "openapi": "3.0.0",
   "paths": {
+    "/v1/me/uploads": {
+      "post": {
+        "operationId": "createUpload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUploadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Upload"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unsupported type or too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a signed URL to upload a joke image to",
+        "tags": [
+          "uploads"
+        ]
+      }
+    },
     "/v1/me": {
       "get": {
         "operationId": "getMe",
@@ -1034,6 +1081,163 @@
         ]
       }
     },
+    "/v1/me/today": {
+      "get": {
+        "operationId": "getToday",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Today"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Today's joke (sealed until opened), this week and the streak",
+        "tags": [
+          "today"
+        ]
+      }
+    },
+    "/v1/me/deliveries/{date}/open": {
+      "post": {
+        "operationId": "openDelivery",
+        "parameters": [
+          {
+            "name": "date",
+            "required": true,
+            "in": "path",
+            "description": "My local date, YYYY-MM-DD",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Joke"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No joke was delivered that day",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "It expired before it was opened",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Open the joke delivered on one of my days. Safe to repeat.",
+        "tags": [
+          "today"
+        ]
+      }
+    },
+    "/v1/me/studio": {
+      "get": {
+        "operationId": "getStudioSummary",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "How my jokes are doing",
+        "tags": [
+          "today"
+        ]
+      }
+    },
+    "/v1/jokes/{id}": {
+      "get": {
+        "operationId": "getJoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Joke"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or not opened yet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A joke I've opened, one of mine, or any joke for curators",
+        "tags": [
+          "jokes"
+        ]
+      }
+    },
     "/v1/auth/email/start": {
       "post": {
         "operationId": "startEmailSignIn",
@@ -1911,6 +2115,60 @@
               "punchline",
               "original"
             ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "image"
+                ]
+              },
+              "imageKey": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "description": "The key from POST /v1/me/uploads, after the file is uploaded."
+              },
+              "imageAlt": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 200
+              },
+              "caption": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "region": {
+                "default": null,
+                "description": "Country whose readers need local knowledge to get it. Null: works everywhere.",
+                "nullable": true,
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 56
+              },
+              "topics": {
+                "default": [],
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "original": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "imageKey",
+              "imageAlt",
+              "original"
+            ]
           }
         ]
       },
@@ -2045,6 +2303,440 @@
         "required": [
           "data",
           "nextCursor"
+        ]
+      },
+      "ReactionCounts": {
+        "type": "object",
+        "properties": {
+          "laugh": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "groan": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "facepalm": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "drum": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "laugh",
+          "groan",
+          "facepalm",
+          "drum"
+        ]
+      },
+      "Joke": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "text",
+              "image"
+            ]
+          },
+          "setup": {
+            "nullable": true,
+            "type": "string"
+          },
+          "punchline": {
+            "nullable": true,
+            "type": "string"
+          },
+          "imageUrl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "imageAlt": {
+            "nullable": true,
+            "type": "string"
+          },
+          "caption": {
+            "nullable": true,
+            "type": "string"
+          },
+          "background": {
+            "type": "string",
+            "enum": [
+              "red",
+              "navy",
+              "yellow",
+              "green",
+              "denim"
+            ]
+          },
+          "region": {
+            "nullable": true,
+            "type": "string"
+          },
+          "topics": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "deliverOn": {
+            "nullable": true,
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "creator": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": {
+                "type": "string"
+              },
+              "handle": {
+                "type": "string"
+              },
+              "country": {
+                "nullable": true,
+                "type": "string"
+              },
+              "tone": {
+                "type": "string",
+                "enum": [
+                  "red",
+                  "navy",
+                  "yellow",
+                  "green",
+                  "denim"
+                ]
+              },
+              "bio": {
+                "type": "string"
+              },
+              "subscriberCount": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "isSubscribed": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "handle",
+              "country",
+              "tone",
+              "bio",
+              "subscriberCount",
+              "isSubscribed"
+            ]
+          },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "views": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "reactions": {
+                "$ref": "#/components/schemas/ReactionCounts"
+              },
+              "comments": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "views",
+              "reactions",
+              "comments"
+            ]
+          },
+          "myReaction": {
+            "nullable": true,
+            "type": "string",
+            "enum": [
+              "laugh",
+              "groan",
+              "facepalm",
+              "drum"
+            ]
+          },
+          "isMine": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "setup",
+          "punchline",
+          "imageUrl",
+          "imageAlt",
+          "caption",
+          "background",
+          "region",
+          "topics",
+          "deliverOn",
+          "creator",
+          "stats",
+          "myReaction",
+          "isMine"
+        ]
+      },
+      "DeliveryCard": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "sealed",
+              "opened",
+              "missed"
+            ]
+          },
+          "deliveredAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "text",
+              "image"
+            ]
+          },
+          "background": {
+            "type": "string",
+            "enum": [
+              "red",
+              "navy",
+              "yellow",
+              "green",
+              "denim"
+            ]
+          },
+          "creator": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "handle": {
+                "type": "string"
+              },
+              "tone": {
+                "type": "string",
+                "enum": [
+                  "red",
+                  "navy",
+                  "yellow",
+                  "green",
+                  "denim"
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "handle",
+              "tone"
+            ]
+          },
+          "jokeId": {
+            "nullable": true,
+            "description": "Only once opened: the joke stays sealed until then.",
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "date",
+          "state",
+          "deliveredAt",
+          "expiresAt",
+          "kind",
+          "background",
+          "creator",
+          "jokeId"
+        ]
+      },
+      "Today": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+            "description": "The reader's local date."
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "deliveryHour": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "nextDeliveryAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "current": {
+            "nullable": true,
+            "description": "Today's joke, or yesterday's if it can still be opened.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryCard"
+              }
+            ]
+          },
+          "week": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "sealed",
+                    "opened",
+                    "missed",
+                    "upcoming",
+                    "none"
+                  ]
+                },
+                "creator": {
+                  "nullable": true,
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "tone": {
+                      "type": "string",
+                      "enum": [
+                        "red",
+                        "navy",
+                        "yellow",
+                        "green",
+                        "denim"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "tone"
+                  ]
+                },
+                "jokeId": {
+                  "nullable": true,
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "date",
+                "state",
+                "creator",
+                "jokeId"
+              ]
+            }
+          },
+          "streak": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Days in a row with the joke opened."
+          }
+        },
+        "required": [
+          "date",
+          "timezone",
+          "deliveryHour",
+          "nextDeliveryAt",
+          "current",
+          "week",
+          "streak"
+        ]
+      },
+      "StudioSummary": {
+        "type": "object",
+        "properties": {
+          "sent": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "picked": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "inReview": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "reached": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Readers your jokes were delivered to."
+          },
+          "opened": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "tipsKes": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "sent",
+          "picked",
+          "inReview",
+          "reached",
+          "opened",
+          "tipsKes"
         ]
       },
       "JokeCreator": {
@@ -2412,6 +3104,66 @@
         },
         "required": [
           "reason"
+        ]
+      },
+      "CreateUploadRequest": {
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "image/png",
+              "image/jpeg",
+              "image/gif",
+              "image/webp"
+            ]
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10485760
+          }
+        },
+        "required": [
+          "contentType",
+          "size"
+        ]
+      },
+      "Upload": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Send this as imageKey when submitting the joke."
+          },
+          "url": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "PUT"
+            ]
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Send these headers with the upload, exactly."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "key",
+          "url",
+          "method",
+          "headers",
+          "expiresAt"
         ]
       }
     }

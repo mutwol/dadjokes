@@ -168,3 +168,8 @@
     padding-top: 0;
   }
 }
+
+.sub-thumb .story-caption {
+  font-size: 6.5px;
+  padding: 6px;
+}

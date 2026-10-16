@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { api, errorMessage, refreshAccessToken, setAccessToken, unwrap } from "../api/client.ts";
 import type { Me, Session } from "../api/client.ts";
-import { DEFAULT_DELIVERY_HOUR, seenDays } from "../data/mock.ts";
 import type { Comment, NotificationState, ReactionKind, Role } from "../data/types.ts";
 import { Ctx } from "./useStore.ts";
 import type { AuthStatus, Store } from "./useStore.ts";
 
 const NOTIFY_KEY = "daddyjokes.notifications";
+const DEFAULT_DELIVERY_HOUR = 8;
 
 function loadNotifications(): NotificationState {
   try {
@@ -22,7 +22,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [account, setAccountState] = useState<Me | null>(null);
   const [notifications, setNotificationsState] = useState<NotificationState>(loadNotifications);
-  const [seen, setSeen] = useState(() => new Set(seenDays));
   const [reactions, setReactions] = useState<Record<string, ReactionKind>>({});
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
   const [toast, setToast] = useState<string | null>(null);
@@ -119,10 +118,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const markSeen = useCallback((day: string) => {
-    setSeen((prev) => (prev.has(day) ? prev : new Set(prev).add(day)));
-  }, []);
-
   const react = useCallback((jokeId: string, kind: ReactionKind) => {
     setReactions((prev) => {
       const next = { ...prev };
@@ -144,15 +139,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       notifications,
       setNotifications,
 
-      seen,
-      markSeen,
       myReaction: (id) => reactions[id],
       react,
       reactionsFor: (joke) => {
         const mine = reactions[joke.id];
-        return mine ? { ...joke.reactions, [mine]: joke.reactions[mine] + 1 } : joke.reactions;
+        const base = joke.stats.reactions;
+        return mine ? { ...base, [mine]: base[mine] + 1 } : base;
       },
-      commentsFor: (joke) => [...(comments[joke.id] ?? []), ...joke.comments],
+      commentsFor: (joke) => comments[joke.id] ?? [],
       addComment: (jokeId, body) =>
         setComments((prev) => ({
           ...prev,
@@ -182,8 +176,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       signOut,
       notifications,
       setNotifications,
-      seen,
-      markSeen,
       reactions,
       react,
       comments,

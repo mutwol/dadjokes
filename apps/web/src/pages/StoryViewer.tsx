@@ -1,12 +1,14 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { FormEvent, PointerEvent } from "react";
-import { Link, Navigate, useNavigate, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
+import { ApiError, api, unwrap } from "../api/client.ts";
+import type { Joke } from "../api/client.ts";
 import { Icon } from "../components/Icon.tsx";
 import { NameTag } from "../components/NameTag.tsx";
 import { ReactionBar } from "../components/Reactions.tsx";
 import { StoryCard } from "../components/StoryCard.tsx";
-import { formatHour } from "../components/useCountdown.ts";
-import { creatorById, jokeById } from "../data/mock.ts";
+import { shortDate } from "../data/dates.ts";
+import { faceOf } from "../data/face.ts";
 import { useStore } from "../state/useStore.ts";
 import "./StoryViewer.css";
 
@@ -19,18 +21,46 @@ function prefersReducedMotion(): boolean {
   return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 }
 
+const IS_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * `/view/2026-10-16` opens that day's delivered joke (the "open once" moment);
+ * `/view/<joke id>` replays a joke that's already been opened.
+ */
 export function StoryViewer() {
   const { id = "" } = useParams();
-  const joke = jokeById(id);
-  if (!joke) return <Navigate to="/" replace />;
-  return <Viewer key={joke.id} jokeId={joke.id} />;
+  const navigate = useNavigate();
+  const { showToast } = useStore();
+  const [joke, setJoke] = useState<Joke | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = IS_DATE.test(id)
+      ? api.POST("/v1/me/deliveries/{date}/open", { params: { path: { date: id } } })
+      : api.GET("/v1/jokes/{id}", { params: { path: { id } } });
+    load.then(unwrap).then(
+      (j) => {
+        if (!cancelled) setJoke(j);
+      },
+      (e: unknown) => {
+        if (cancelled) return;
+        showToast(e instanceof ApiError && e.status === 410 ? e.problem.title : "That joke isn't available.");
+        void navigate("/", { replace: true });
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [id, navigate, showToast]);
+
+  if (!joke) return <div className="viewer" role="dialog" aria-modal="true" aria-label="Opening the joke" aria-busy="true" />;
+  return <Viewer key={joke.id} joke={joke} />;
 }
 
-function Viewer({ jokeId }: { jokeId: string }) {
-  const joke = jokeById(jokeId)!;
-  const creator = creatorById(joke.creatorId);
+function Viewer({ joke }: { joke: Joke }) {
+  const creator = joke.creator;
   const navigate = useNavigate();
-  const { markSeen, react, myReaction, addComment, showToast, deliveryHour } = useStore();
+  const { react, myReaction, addComment, showToast } = useStore();
 
   // Image jokes are a single slide; text jokes are setup, then punchline.
   const steps = joke.kind === "text" ? 2 : 1;
@@ -45,10 +75,6 @@ function Viewer({ jokeId }: { jokeId: string }) {
   const revealed = joke.kind === "image" || step >= 1;
   const paused = held || typing;
   const isLast = step === steps - 1;
-
-  useEffect(() => {
-    if (revealed) markSeen(joke.deliverOn);
-  }, [revealed, markSeen, joke.deliverOn]);
 
   const close = () => {
     void navigate("/");
@@ -112,7 +138,7 @@ function Viewer({ jokeId }: { jokeId: string }) {
       aria-label={`Today's joke from ${creator.name}`}
     >
       <div className="viewer-frame">
-        <StoryCard face={joke} revealed={revealed} variant="full" animate={!reduced} />
+        <StoryCard face={faceOf(joke)} revealed={revealed} variant="full" animate={!reduced} />
 
         <div className="viewer-top">
           <div className="progress" aria-hidden="true">
@@ -136,7 +162,7 @@ function Viewer({ jokeId }: { jokeId: string }) {
           <div className="viewer-byline">
             <NameTag name={creator.name.split(" ")[0]} size="s" tilt={-4} />
             <p className="viewer-when">
-              Today at {formatHour(deliveryHour)}
+              {joke.deliverOn ? shortDate(joke.deliverOn) : "Preview"}
               <span className="visually-hidden">, from {creator.name}</span>
             </p>
             <button type="button" className="viewer-close" onClick={close} aria-label="Close">

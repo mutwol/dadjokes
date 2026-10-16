@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { api, errorMessage, unwrap } from "../api/client.ts";
-import type { Submission } from "../api/client.ts";
+import type { StudioSummary, Submission } from "../api/client.ts";
 import { Icon } from "../components/Icon.tsx";
 import { StoryCard } from "../components/StoryCard.tsx";
+import { faceOf } from "../data/face.ts";
+import { compact } from "../data/reactions.ts";
 
 import { longDate } from "../data/dates.ts";
 import { useStore } from "../state/useStore.ts";
@@ -32,6 +34,7 @@ export function Studio() {
   const [failed, setFailed] = useState(false);
 
   const [attempt, setAttempt] = useState(0);
+  const [summary, setSummary] = useState<StudioSummary | null>(null);
 
   const fetchPage = useCallback(
     (cursor?: string) => api.GET("/v1/me/jokes", { params: { query: { limit: 20, cursor } } }).then(unwrap),
@@ -40,6 +43,12 @@ export function Studio() {
 
   useEffect(() => {
     let cancelled = false;
+    void api
+      .GET("/v1/me/studio")
+      .then(unwrap)
+      .then((sum) => {
+        if (!cancelled) setSummary(sum);
+      }, () => undefined);
     fetchPage().then(
       (page) => {
         if (cancelled) return;
@@ -72,6 +81,9 @@ export function Studio() {
         await api.POST("/v1/me/jokes/{id}/withdraw", { params: { path: { id: s.id } } }),
       );
       setJokes((prev) => prev?.map((j) => (j.id === s.id ? updated : j)) ?? null);
+      setSummary((sum) =>
+        sum ? { ...sum, inReview: sum.inReview - (s.status === "in_review" ? 1 : 0), picked: sum.picked - (s.status === "scheduled" ? 1 : 0) } : sum,
+      );
       showToast("Joke withdrawn");
     } catch (e) {
       showToast(errorMessage(e));
@@ -79,7 +91,6 @@ export function Studio() {
   };
 
   const list = jokes ?? [];
-  const count = (...statuses: Submission["status"][]) => list.filter((j) => statuses.includes(j.status)).length;
 
   return (
     <div className="studio">
@@ -91,22 +102,22 @@ export function Studio() {
         </Link>
       </header>
 
-      <dl className="studio-stats" aria-busy={jokes === null}>
+      <dl className="studio-stats" aria-busy={summary === null}>
         <div>
-          <dt>Jokes sent</dt>
-          <dd>{jokes ? list.length : "–"}</dd>
+          <dt>People reached</dt>
+          <dd>{summary ? compact(summary.reached) : "–"}</dd>
         </div>
         <div>
           <dt>Jokes picked</dt>
-          <dd>{jokes ? count("scheduled", "delivered") : "–"}</dd>
+          <dd>{summary ? summary.picked : "–"}</dd>
         </div>
         <div>
           <dt>Waiting for review</dt>
-          <dd>{jokes ? count("in_review") : "–"}</dd>
+          <dd>{summary ? summary.inReview : "–"}</dd>
         </div>
         <div>
           <dt>Tips received</dt>
-          <dd>KES 0</dd>
+          <dd>{summary ? `KES ${compact(summary.tipsKes)}` : "–"}</dd>
         </div>
       </dl>
 
@@ -129,11 +140,7 @@ export function Studio() {
               <li key={s.id} className="sub">
                 <div className="sub-thumb">
                   <StoryCard
-                    face={
-                      s.kind === "text"
-                        ? { kind: "text", setup: s.setup ?? "", punchline: s.punchline ?? "", background: s.background }
-                        : { kind: "image", imageUrl: s.imageUrl ?? undefined, imageAlt: s.imageAlt ?? "", caption: s.caption ?? "" }
-                    }
+                    face={faceOf(s)}
                     revealed
                     animate={false}
                   />

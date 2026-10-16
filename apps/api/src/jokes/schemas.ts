@@ -27,9 +27,19 @@ export const CreateTextJokeRequest = z.object({
   original: Original,
 });
 
+export const CreateImageJokeRequest = z.object({
+  kind: z.literal("image"),
+  imageKey: z.string().min(1).max(200).describe("The key from POST /v1/me/uploads, after the file is uploaded."),
+  imageAlt: z.string().trim().min(3, "Describe the image for people who can't see it.").max(200),
+  caption: z.string().trim().max(80).optional(),
+  region: Region,
+  topics: Topics,
+  original: Original,
+});
+
 export const CreateJokeRequest = named(
   "CreateJokeRequest",
-  z.discriminatedUnion("kind", [CreateTextJokeRequest]),
+  z.discriminatedUnion("kind", [CreateTextJokeRequest, CreateImageJokeRequest]),
   "A new joke for curators to review.",
 );
 export type CreateJokeRequest = z.infer<typeof CreateJokeRequest>;

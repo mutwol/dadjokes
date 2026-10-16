@@ -199,7 +199,8 @@ export const jokes = pgTable(
     kind: jokeKindEnum("kind").notNull().default("text"),
     setup: text("setup"),
     punchline: text("punchline"),
-    imageUrl: text("image_url"),
+    /** Where the image is in storage (see StorageService). The API turns it into a public URL. */
+    imageKey: text("image_key"),
     imageAlt: text("image_alt"),
     caption: text("caption"),
     background: toneEnum("background").notNull().default("red"),
@@ -229,7 +230,7 @@ export const jokes = pgTable(
     check(
       "jokes_content",
       sql`(${t.kind} = 'text' and ${t.setup} is not null and ${t.punchline} is not null)
-        or (${t.kind} = 'image' and ${t.imageUrl} is not null and ${t.imageAlt} is not null)`,
+        or (${t.kind} = 'image' and ${t.imageKey} is not null and ${t.imageAlt} is not null)`,
     ),
     check("jokes_declined_has_reason", sql`(${t.status} = 'declined') = (${t.declineReason} is not null)`),
     check(
@@ -257,9 +258,37 @@ export const jokeTopics = pgTable(
   (t) => [primaryKey({ columns: [t.jokeId, t.topicSlug] }), index("joke_topics_topic_idx").on(t.topicSlug)],
 );
 
+/**
+ * A reader's joke for one of their local days. Created when their delivery
+ * hour arrives; "open once" is enforced here: it can be opened until it expires,
+ * and once opened it stays readable.
+ */
+export const deliveries = pgTable(
+  "deliveries",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** The reader's own calendar date for this joke. */
+    localDate: date("local_date", { mode: "string" }).notNull(),
+    jokeId: uuid("joke_id")
+      .notNull()
+      .references(() => jokes.id, { onDelete: "cascade" }),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    openedAt: timestamp("opened_at", { withTimezone: true }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.localDate] }),
+    index("deliveries_joke_idx").on(t.jokeId),
+    check("deliveries_expiry_after_delivery", sql`${t.expiresAt} > ${t.deliveredAt}`),
+  ],
+);
+
 export type Role = (typeof roleEnum.enumValues)[number];
 export type Tone = (typeof toneEnum.enumValues)[number];
 export type User = typeof users.$inferSelect;
 export type Joke = typeof jokes.$inferSelect;
 export type JokeStatus = (typeof jokeStatusEnum.enumValues)[number];
+export type Delivery = typeof deliveries.$inferSelect;
 export type DeclineReason = (typeof declineReasonEnum.enumValues)[number];

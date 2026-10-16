@@ -7,7 +7,7 @@ import { Icon } from "../../components/Icon.tsx";
 import { NameTag } from "../../components/NameTag.tsx";
 import { StoryCard } from "../../components/StoryCard.tsx";
 import { formatHour } from "../../components/useCountdown.ts";
-import { COUNTRIES, jokeForDay, TODAY } from "../../data/mock.ts";
+import { COUNTRIES, SAMPLE_JOKE } from "../../data/sample.ts";
 import { compact } from "../../data/reactions.ts";
 import type { Role } from "../../data/types.ts";
 import { useStore } from "../../state/useStore.ts";
@@ -20,7 +20,7 @@ import { GoogleSignIn } from "./GoogleSignIn.tsx";
 export function WelcomeStep() {
   const { goTo, update } = useFlow();
   const { setSession, showToast } = useStore();
-  const sample = jokeForDay(TODAY);
+  const sample = SAMPLE_JOKE;
 
   const onGoogle = async (idToken: string) => {
     try {

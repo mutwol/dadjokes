@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/v1/me/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Get a signed URL to upload a joke image to */
+        post: operations["createUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me": {
         parameters: {
             query?: never;
@@ -334,6 +351,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Today's joke (sealed until opened), this week and the streak */
+        get: operations["getToday"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/deliveries/{date}/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Open the joke delivered on one of my days. Safe to repeat. */
+        post: operations["openDelivery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/studio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How my jokes are doing */
+        get: operations["getStudioSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/jokes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A joke I've opened, one of mine, or any joke for curators */
+        get: operations["getJoke"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/email/start": {
         parameters: {
             query?: never;
@@ -584,6 +669,22 @@ export interface components {
             topics?: string[];
             /** @enum {boolean} */
             original: true;
+        } | {
+            /** @enum {string} */
+            kind: "image";
+            /** @description The key from POST /v1/me/uploads, after the file is uploaded. */
+            imageKey: string;
+            imageAlt: string;
+            caption?: string;
+            /**
+             * @description Country whose readers need local knowledge to get it. Null: works everywhere.
+             * @default null
+             */
+            region?: string | null;
+            /** @default [] */
+            topics?: string[];
+            /** @enum {boolean} */
+            original: true;
         };
         Submission: {
             /** Format: uuid */
@@ -613,6 +714,111 @@ export interface components {
         SubmissionPage: {
             data: components["schemas"]["Submission"][];
             nextCursor: string | null;
+        };
+        ReactionCounts: {
+            laugh: number;
+            groan: number;
+            facepalm: number;
+            drum: number;
+        };
+        Joke: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "text" | "image";
+            setup: string | null;
+            punchline: string | null;
+            imageUrl: string | null;
+            imageAlt: string | null;
+            caption: string | null;
+            /** @enum {string} */
+            background: "red" | "navy" | "yellow" | "green" | "denim";
+            region: string | null;
+            topics: string[];
+            /** Format: date */
+            deliverOn: string | null;
+            creator: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                handle: string;
+                country: string | null;
+                /** @enum {string} */
+                tone: "red" | "navy" | "yellow" | "green" | "denim";
+                bio: string;
+                subscriberCount: number;
+                isSubscribed: boolean;
+            };
+            stats: {
+                views: number;
+                reactions: components["schemas"]["ReactionCounts"];
+                comments: number;
+            };
+            /** @enum {string|null} */
+            myReaction: "laugh" | "groan" | "facepalm" | "drum" | null;
+            isMine: boolean;
+        };
+        DeliveryCard: {
+            /** Format: date */
+            date: string;
+            /** @enum {string} */
+            state: "sealed" | "opened" | "missed";
+            /** Format: date-time */
+            deliveredAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** @enum {string} */
+            kind: "text" | "image";
+            /** @enum {string} */
+            background: "red" | "navy" | "yellow" | "green" | "denim";
+            creator: {
+                name: string;
+                handle: string;
+                /** @enum {string} */
+                tone: "red" | "navy" | "yellow" | "green" | "denim";
+            };
+            /**
+             * Format: uuid
+             * @description Only once opened: the joke stays sealed until then.
+             */
+            jokeId: string | null;
+        };
+        Today: {
+            /**
+             * Format: date
+             * @description The reader's local date.
+             */
+            date: string;
+            timezone: string;
+            deliveryHour: number;
+            /** Format: date-time */
+            nextDeliveryAt: string;
+            /** @description Today's joke, or yesterday's if it can still be opened. */
+            current: components["schemas"]["DeliveryCard"] | null;
+            week: {
+                /** Format: date */
+                date: string;
+                /** @enum {string} */
+                state: "sealed" | "opened" | "missed" | "upcoming" | "none";
+                creator: {
+                    name: string;
+                    /** @enum {string} */
+                    tone: "red" | "navy" | "yellow" | "green" | "denim";
+                } | null;
+                /** Format: uuid */
+                jokeId: string | null;
+            }[];
+            /** @description Days in a row with the joke opened. */
+            streak: number;
+        };
+        StudioSummary: {
+            sent: number;
+            picked: number;
+            inReview: number;
+            /** @description Readers your jokes were delivered to. */
+            reached: number;
+            opened: number;
+            tipsKes: number;
         };
         JokeCreator: {
             /** Format: uuid */
@@ -699,6 +905,24 @@ export interface components {
             reason: "possible_copy" | "not_a_dad_joke" | "offensive" | "unclear" | "other";
             note?: string;
         };
+        CreateUploadRequest: {
+            /** @enum {string} */
+            contentType: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
+            size: number;
+        };
+        Upload: {
+            /** @description Send this as imageKey when submitting the joke. */
+            key: string;
+            url: string;
+            /** @enum {string} */
+            method: "PUT";
+            /** @description Send these headers with the upload, exactly. */
+            headers: {
+                [key: string]: string;
+            };
+            /** Format: date-time */
+            expiresAt: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -708,6 +932,39 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    createUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUploadRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Upload"];
+                };
+            };
+            /** @description Unsupported type or too large */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     getMe: {
         parameters: {
             query?: never;
@@ -1362,6 +1619,118 @@ export interface operations {
             };
             /** @description Already going out */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getToday: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Today"];
+                };
+            };
+        };
+    };
+    openDelivery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description My local date, YYYY-MM-DD */
+                date: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Joke"];
+                };
+            };
+            /** @description No joke was delivered that day */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description It expired before it was opened */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getStudioSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudioSummary"];
+                };
+            };
+        };
+    };
+    getJoke: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Joke"];
+                };
+            };
+            /** @description Not found, or not opened yet */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

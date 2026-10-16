@@ -20,6 +20,10 @@ export type CuratedJoke = Schemas["CuratedJoke"];
 export type QueueItem = Schemas["QueueItem"];
 export type PossibleCopy = Schemas["PossibleCopy"];
 export type CurationCalendar = Schemas["CurationCalendar"];
+export type Joke = Schemas["Joke"];
+export type Today = Schemas["Today"];
+export type DeliveryCard = Schemas["DeliveryCard"];
+export type StudioSummary = Schemas["StudioSummary"];
 
 /** Error thrown by `unwrap` for any non-2xx response. */
 export class ApiError extends Error {

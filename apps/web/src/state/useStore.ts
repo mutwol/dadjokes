@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
-import type { Me, Session } from "../api/client.ts";
-import type { Comment, Joke, NotificationState, ReactionKind, Role } from "../data/types.ts";
+import type { Joke, Me, Session } from "../api/client.ts";
+import type { Comment, NotificationState, ReactionKind, Role } from "../data/types.ts";
 
 export type AuthStatus = "loading" | "signed-out" | "signed-in";
 
@@ -20,8 +20,6 @@ export interface Store {
   notifications: NotificationState;
   setNotifications: (n: NotificationState) => void;
 
-  seen: Set<string>;
-  markSeen: (day: string) => void;
   myReaction: (jokeId: string) => ReactionKind | undefined;
   react: (jokeId: string, kind: ReactionKind) => void;
   reactionsFor: (joke: Joke) => Record<ReactionKind, number>;

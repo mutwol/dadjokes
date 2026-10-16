@@ -7,7 +7,8 @@ import { InjectDb } from "../db/db.module";
 import type { Db, Tx } from "../db/db.module";
 import { jokes, jokeText, users } from "../db/schema";
 import type { Joke } from "../db/schema";
-import { JokesService, toSubmission } from "../jokes/jokes.service";
+import { JokesService } from "../jokes/jokes.service";
+import type { Submission } from "../jokes/schemas";
 import type { CalendarQuery, CuratedJoke, DeclineRequest, QueueQuery, ScheduleRequest } from "./schemas";
 
 /** Jokes at least this similar (trigram similarity, 0-1) are flagged as possible copies. */
@@ -54,7 +55,7 @@ export class CurationService {
     ]);
     const data = await Promise.all(
       page.map(async (r) => ({
-        joke: toCurated(r, topics.get(r.joke.id) ?? []),
+        joke: this.toCurated(r, topics.get(r.joke.id) ?? []),
         possibleCopies: await this.possibleCopies(r.joke),
       })),
     );
@@ -197,7 +198,11 @@ export class CurationService {
       .innerJoin(users, eq(users.id, jokes.creatorId))
       .where(eq(jokes.id, id));
     if (!row) throw notFound("Joke");
-    return toCurated(row, (await this.jokes.topicsFor([id], tx)).get(id) ?? []);
+    return this.toCurated(row, (await this.jokes.topicsFor([id], tx)).get(id) ?? []);
+  }
+
+  private toCurated(row: CuratedRow, topics: string[]): CuratedJoke {
+    return toCurated(row, this.jokes.toSubmission(row.joke, topics));
   }
 
   private async lock(tx: Tx, id: string): Promise<Joke> {
@@ -207,18 +212,17 @@ export class CurationService {
   }
 }
 
-function toCurated(
-  r: {
-    joke: Joke;
-    creatorName: string | null;
-    creatorHandle: string | null;
-    creatorCountry: string | null;
-    creatorTone: CuratedJoke["creator"]["tone"];
-  },
-  topics: string[],
-): CuratedJoke {
+interface CuratedRow {
+  joke: Joke;
+  creatorName: string | null;
+  creatorHandle: string | null;
+  creatorCountry: string | null;
+  creatorTone: CuratedJoke["creator"]["tone"];
+}
+
+function toCurated(r: CuratedRow, submission: Submission): CuratedJoke {
   return {
-    ...toSubmission(r.joke, topics),
+    ...submission,
     reviewedAt: r.joke.reviewedAt?.toISOString() ?? null,
     creator: {
       id: r.joke.creatorId,

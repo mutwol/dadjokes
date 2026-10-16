@@ -6,8 +6,10 @@ import { AuthModule } from "./auth/auth.module";
 import { AppConfig, AppConfigModule } from "./config/config.module";
 import { CreatorsModule } from "./creators/creators.module";
 import { DbModule } from "./db/db.module";
+import { DeliveriesModule } from "./deliveries/deliveries.module";
 import { CurationModule } from "./curation/curation.module";
 import { JokesModule } from "./jokes/jokes.module";
+import { StorageModule } from "./storage/storage.module";
 import { HealthController } from "./health/health.controller";
 import { MailModule } from "./mail/mail.module";
 import { UsersModule } from "./users/users.module";
@@ -45,10 +47,12 @@ export const queueRoot = BullModule.forRootAsync({
       }),
     }),
     MailModule,
+    StorageModule,
     UsersModule,
     CreatorsModule,
     JokesModule,
     CurationModule,
+    DeliveriesModule,
     AuthModule,
   ],
   controllers: [HealthController],

@@ -8,6 +8,9 @@ import type { Db, Tx } from "../db/db.module";
 import { jokes, jokeTopics } from "../db/schema";
 import type { Joke } from "../db/schema";
 import { assertTopicsExist } from "../db/topics";
+import { IMAGE_TYPES, MAX_IMAGE_BYTES, looksLike } from "../storage/images";
+import type { ImageType } from "../storage/images";
+import { StorageService } from "../storage/storage.service";
 import type { CreateJokeRequest, ListMyJokesQuery, Submission } from "./schemas";
 
 /** At most this many of a writer's jokes can wait for review at once. */
@@ -15,10 +18,14 @@ export const MAX_IN_REVIEW = 5;
 
 @Injectable()
 export class JokesService {
-  constructor(@InjectDb() private readonly db: Db) {}
+  constructor(
+    @InjectDb() private readonly db: Db,
+    private readonly storage: StorageService,
+  ) {}
 
   async submit(creatorId: string, req: CreateJokeRequest): Promise<Submission> {
     const topics = [...new Set(req.topics)];
+    if (req.kind === "image") await this.checkImage(creatorId, req.imageKey);
     return this.db.transaction(async (tx) => {
       // Serialise one writer's submissions so the in-review limit can't be raced.
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`submit:${creatorId}`}))`);
@@ -43,26 +50,24 @@ export class JokesService {
           and(
             eq(jokes.creatorId, creatorId),
             inArray(jokes.status, ["in_review", "scheduled", "delivered"]),
-            sql`lower(${jokes.setup}) = lower(${req.setup})`,
-            sql`lower(${jokes.punchline}) = lower(${req.punchline})`,
+            req.kind === "text"
+              ? and(sql`lower(${jokes.setup}) = lower(${req.setup})`, sql`lower(${jokes.punchline}) = lower(${req.punchline})`)
+              : eq(jokes.imageKey, req.imageKey),
           ),
         )
         .limit(1);
       if (dupe) throw new AppError(409, "duplicate_submission", "You've already sent this joke.");
 
+      const content =
+        req.kind === "text"
+          ? { kind: "text" as const, setup: req.setup, punchline: req.punchline, background: req.background }
+          : { kind: "image" as const, imageKey: req.imageKey, imageAlt: req.imageAlt, caption: req.caption || null };
       const [row] = await tx
         .insert(jokes)
-        .values({
-          creatorId,
-          kind: "text",
-          setup: req.setup,
-          punchline: req.punchline,
-          background: req.background,
-          region: req.region,
-        })
+        .values({ creatorId, region: req.region, ...content })
         .returning();
       if (topics.length) await tx.insert(jokeTopics).values(topics.map((topicSlug) => ({ jokeId: row.id, topicSlug })));
-      return toSubmission(row, topics);
+      return this.toSubmission(row, topics);
     });
   }
 
@@ -89,7 +94,7 @@ export class JokesService {
     const topics = await this.topicsFor(page.map((r) => r.id));
     const last = page.at(-1);
     return {
-      data: page.map((r) => toSubmission(r, topics.get(r.id) ?? [])),
+      data: page.map((r) => this.toSubmission(r, topics.get(r.id) ?? [])),
       nextCursor:
         rows.length > q.limit && last ? encodeCursor({ t: last.submittedAt.toISOString(), id: last.id }) : null,
     };
@@ -97,14 +102,14 @@ export class JokesService {
 
   async getMine(creatorId: string, id: string): Promise<Submission> {
     const row = await this.findMine(this.db, creatorId, id);
-    return toSubmission(row, (await this.topicsFor([id])).get(id) ?? []);
+    return this.toSubmission(row, (await this.topicsFor([id])).get(id) ?? []);
   }
 
   /** Takes a joke out of review, or off the schedule if its day hasn't started anywhere yet. */
   async withdraw(creatorId: string, id: string): Promise<Submission> {
     return this.db.transaction(async (tx) => {
       const row = await this.findMine(tx, creatorId, id, true);
-      if (row.status === "withdrawn") return toSubmission(row, (await this.topicsFor([id], tx)).get(id) ?? []);
+      if (row.status === "withdrawn") return this.toSubmission(row, (await this.topicsFor([id], tx)).get(id) ?? []);
       if (!canWithdraw(row)) {
         throw new AppError(
           409,
@@ -119,8 +124,24 @@ export class JokesService {
         .set({ status: "withdrawn", deliverOn: null })
         .where(eq(jokes.id, id))
         .returning();
-      return toSubmission(updated, (await this.topicsFor([id], tx)).get(id) ?? []);
+      return this.toSubmission(updated, (await this.topicsFor([id], tx)).get(id) ?? []);
     });
+  }
+
+  toSubmission(r: Joke, topics: string[]): Submission {
+    return toSubmission(r, topics, (key) => this.storage.publicUrl(key));
+  }
+
+  /** The image must be this writer's own upload, finished, and really an image of the declared type. */
+  private async checkImage(creatorId: string, key: string) {
+    const invalid = (title: string) =>
+      new AppError(422, "invalid_image", title, { errors: [{ path: "imageKey", message: title }] });
+    if (!key.startsWith(`jokes/${creatorId}/`)) throw invalid("Upload the image first.");
+    const obj = await this.storage.head(key);
+    if (!obj) throw invalid("The image hasn't finished uploading. Try again.");
+    const type = obj.contentType as ImageType;
+    if (!(type in IMAGE_TYPES) || obj.size > MAX_IMAGE_BYTES) throw invalid("Use a PNG, JPG, GIF or WebP up to 10 MB.");
+    if (!looksLike(type, await this.storage.readStart(key, 16))) throw invalid("That file isn't a valid image.");
   }
 
   private async findMine(tx: Tx, creatorId: string, id: string, forUpdate = false): Promise<Joke> {
@@ -150,13 +171,13 @@ export function canWithdraw(j: Pick<Joke, "status" | "deliverOn">, now = new Dat
   return j.status === "scheduled" && j.deliverOn !== null && j.deliverOn >= firstOpenDay(now);
 }
 
-export function toSubmission(r: Joke, topics: string[]): Submission {
+export function toSubmission(r: Joke, topics: string[], mediaUrl: (key: string) => string): Submission {
   return {
     id: r.id,
     kind: r.kind,
     setup: r.setup,
     punchline: r.punchline,
-    imageUrl: r.imageUrl,
+    imageUrl: r.imageKey ? mediaUrl(r.imageKey) : null,
     imageAlt: r.imageAlt,
     caption: r.caption,
     background: r.background,

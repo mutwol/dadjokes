@@ -1,9 +1,12 @@
 import type { NestExpressApplication } from "@nestjs/platform-express";
+import { ConfigService } from "@nestjs/config";
 import { Test } from "@nestjs/testing";
 import { sql } from "drizzle-orm";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
 import { configureApp } from "../src/bootstrap";
+import { AppConfig } from "../src/config/config.module";
+import type { Env } from "../src/config/env";
 import { DB } from "../src/db/db.module";
 import type { Db } from "../src/db/db.module";
 import { seed } from "../src/db/seed";
@@ -25,11 +28,22 @@ export interface TestApp {
   close: () => Promise<void>;
 }
 
-export async function createTestApp(): Promise<TestApp> {
+/** Settings for one test file, on top of the environment in vitest.config.mts. */
+export async function createTestApp(config: Partial<Env> = {}): Promise<TestApp> {
   const mail = new FakeMail();
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(MailService)
     .useValue(mail)
+    .overrideProvider(AppConfig)
+    .useFactory({
+      inject: [ConfigService],
+      factory: (cs: ConfigService<Env, true>) => {
+        const base = new AppConfig(cs);
+        return Object.assign(Object.create(AppConfig.prototype) as AppConfig, {
+          get: <K extends keyof Env>(key: K): Env[K] => (key in config ? (config[key] as Env[K]) : base.get(key)),
+        });
+      },
+    })
     .compile();
   const app = configureApp(moduleRef.createNestApplication<NestExpressApplication>({ logger: false }));
   await app.init();

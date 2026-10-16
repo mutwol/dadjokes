@@ -1,16 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Link, Navigate, useNavigate, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
+import { api, unwrap } from "../api/client.ts";
+import type { Joke } from "../api/client.ts";
 import { Avatar } from "../components/Avatar.tsx";
 import { Icon } from "../components/Icon.tsx";
 import { GroanMeter, ReactionBar } from "../components/Reactions.tsx";
 import { StoryCard } from "../components/StoryCard.tsx";
-import {
-  creatorById,
-  jokeById,
-} from "../data/mock.ts";
-import { compact, totalReactions } from "../data/reactions.ts";
 import { longDate } from "../data/dates.ts";
+import { faceOf } from "../data/face.ts";
+import { compact, totalReactions } from "../data/reactions.ts";
 import { useStore } from "../state/useStore.ts";
 import "./JokeDetail.css";
 
@@ -18,17 +17,43 @@ const TIP_AMOUNTS = [20, 50, 100, 250];
 
 export function JokeDetail() {
   const { id = "" } = useParams();
-  const joke = jokeById(id);
+  const navigate = useNavigate();
+  const { showToast } = useStore();
+  const [joke, setJoke] = useState<Joke | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .GET("/v1/jokes/{id}", { params: { path: { id } } })
+      .then(unwrap)
+      .then(
+        (j) => {
+          if (!cancelled) setJoke(j);
+        },
+        () => {
+          if (cancelled) return;
+          showToast("That joke isn't available.");
+          void navigate("/", { replace: true });
+        },
+      );
+    return () => {
+      cancelled = true;
+    };
+  }, [id, navigate, showToast]);
+
+  if (!joke) return <div className="detail" aria-busy="true" />;
+  return <Detail key={joke.id} joke={joke} />;
+}
+
+function Detail({ joke }: { joke: Joke }) {
   const navigate = useNavigate();
   const { reactionsFor, myReaction, react, commentsFor, addComment, showToast, account } = useStore();
   const [draft, setDraft] = useState("");
   const [tipOpen, setTipOpen] = useState(false);
   const [tip, setTip] = useState(50);
-  const [subscribed, setSubscribed] = useState(false);
+  const [subscribed, setSubscribed] = useState(joke.creator.isSubscribed);
 
-  if (!joke) return <Navigate to="/" replace />;
-
-  const creator = creatorById(joke.creatorId);
+  const creator = joke.creator;
   const counts = reactionsFor(joke);
   const comments = commentsFor(joke);
   const first = creator.name.split(" ")[0];
@@ -39,6 +64,20 @@ export function JokeDetail() {
     if (!body) return;
     addComment(joke.id, body);
     setDraft("");
+  };
+
+  const toggleSubscribe = async () => {
+    const on = subscribed;
+    setSubscribed(!on);
+    const params = { path: { creatorId: creator.id } };
+    const { response } = on
+      ? await api.DELETE("/v1/me/subscriptions/{creatorId}", { params })
+      : await api.PUT("/v1/me/subscriptions/{creatorId}", { params });
+    if (response.ok) showToast(on ? `Unsubscribed from ${first}` : `Subscribed to ${first}`);
+    else {
+      setSubscribed(on);
+      showToast("Couldn't update your subscription. Try again.");
+    }
   };
 
   return (
@@ -52,12 +91,12 @@ export function JokeDetail() {
         >
           <Icon name="back" />
         </button>
-        <h1 className="detail-date">{longDate(joke.deliverOn)}</h1>
+        <h1 className="detail-date">{joke.deliverOn ? longDate(joke.deliverOn) : "Your joke"}</h1>
       </header>
 
       <div className="detail-grid">
         <div className="detail-joke">
-          <StoryCard face={joke} revealed variant="inline" animate={false} />
+          <StoryCard face={faceOf(joke)} revealed variant="inline" animate={false} />
           <Link to={`/view/${joke.id}`} className="btn btn-quiet detail-replay">
             <Icon name="replay" size={20} />
             Replay as a status
@@ -71,20 +110,19 @@ export function JokeDetail() {
               <div>
                 <p className="byline-name">{creator.name}</p>
                 <p className="byline-sub">
-                  @{creator.handle}, {creator.region}
+                  @{creator.handle}
+                  {creator.country ? `, ${creator.country}` : ""}
                 </p>
               </div>
             </div>
             <p className="detail-bio">{creator.bio}</p>
             <div className="detail-creator-actions">
+              {joke.isMine ? null : (
               <button
                 type="button"
                 className={`btn ${subscribed ? "btn-quiet" : "btn-primary"}`}
                 aria-pressed={subscribed}
-                onClick={() => {
-                  setSubscribed((s) => !s);
-                  showToast(subscribed ? `Unsubscribed from ${first}` : `Subscribed to ${first}`);
-                }}
+                onClick={() => void toggleSubscribe()}
               >
                 {subscribed ? (
                   <>
@@ -95,6 +133,7 @@ export function JokeDetail() {
                   "Subscribe"
                 )}
               </button>
+              )}
               <button
                 type="button"
                 className="btn btn-quiet"
@@ -142,7 +181,7 @@ export function JokeDetail() {
             <div className="detail-section-head">
               <h2 id="react-title">How did it land?</h2>
               <p className="detail-counts">
-                <Icon name="eye" size={18} /> {compact(joke.views)} views,{" "}
+                <Icon name="eye" size={18} /> {compact(joke.stats.views)} views,{" "}
                 {compact(totalReactions(counts))} reactions
               </p>
             </div>

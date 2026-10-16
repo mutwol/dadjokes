@@ -13,19 +13,22 @@ and the worker. Vite proxies `/v1` to the API on port 3000, so no CORS setup is 
 | --- | --- |
 | `/welcome` | Onboarding: email, 6-digit code, role (reader, writer or both), profile, then reader steps (topics, writers to subscribe to, delivery time and notifications) and writer steps (tip payouts, originality pledge). Steps adapt to the roles picked |
 | `/` | Today: this week's status rings, today's joke (sealed until opened), streak, delivery time |
-| `/view/:id` | Status viewer: setup, then the punchline after a pause. Tap right/left or use the arrow keys, hold to pause, Esc to close |
+| `/view/:day` · `/view/:jokeId` | Opens that day's joke (once), or replays an opened one. Status viewer: setup, then the punchline after a pause. Tap right/left or use the arrow keys, hold to pause, Esc to close |
 | `/joke/:id` | Joke detail: creator, subscribe, tip, reactions, groan meter, comments |
 | `/create` | Write a joke: setup and punchline or an image, background, region, topics, originality check, live preview |
-| `/studio` | Creator studio: your submissions and their curation status |
+| `/studio` | Creator studio: reach, your submissions, their curation status, withdraw |
+| `/curate` | Curators: review queue with possible copies, calendar of picks, schedule or decline |
 | `/me` | Profile: switch reading and writing on or off, delivery time, payouts, sign out |
 | `/explore`, `/activity` | Placeholders for later steps |
 
 ## What's real and what's still mock
 
-Real, through the API: sign-in (email code, optional Google), onboarding, the account, roles,
-preferences, topics, writers and subscriptions. Still mock data in `src/data/mock.ts`: jokes,
-deliveries, reactions, comments and Studio submissions, until those API phases are built
-(see `docs/backend-architecture.md`).
+Real, through the API: sign-in, onboarding, the account, roles, preferences, writers and
+subscriptions, submitting jokes (text or image) and Studio, curation (`/curate`, for curators),
+Today, opening the daily joke and joke detail. Reactions and comments are still kept in the
+browser until the engagement API is built; tips are not connected yet.
+
+To try curation, sign in as `curator@daddyjokes.local` (seeded; the code is in the API log).
 
 The session is restored from an httpOnly refresh cookie on page load; the access token is only
 kept in memory. To see onboarding again, use **Sign out** on the Profile page and sign up with

@@ -7,6 +7,7 @@ import cookieParser from "cookie-parser";
 import { ProblemFilter } from "./common/errors";
 import { openApiComponents } from "./common/zod";
 import { AppConfig } from "./config/config.module";
+import { StorageService } from "./storage/storage.service";
 
 /** Middleware and conventions shared by the server, the OpenAPI export and tests. */
 export function configureApp(app: NestExpressApplication) {
@@ -17,6 +18,21 @@ export function configureApp(app: NestExpressApplication) {
   app.enableCors({ origin: config.get("WEB_ORIGIN"), credentials: true });
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: "1" });
   app.useGlobalFilters(new ProblemFilter());
+
+  // Local storage: serve uploaded images. Keys are random and never reused, so they cache forever.
+  const storage = app.get(StorageService);
+  if (storage.driver === "local") {
+    app.useStaticAssets(storage.uploadDir, {
+      prefix: "/media",
+      immutable: true,
+      maxAge: "365d",
+      fallthrough: false,
+      setHeaders: (res) => {
+        res.setHeader("X-Content-Type-Options", "nosniff");
+        res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
+      },
+    });
+  }
   app.enableShutdownHooks();
   return app;
 }

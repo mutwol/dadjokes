@@ -15,3 +15,6 @@ coverage
 
 # Redis snapshots from local runs
 *.rdb
+
+# Images uploaded with STORAGE_DRIVER=local
+uploads/
