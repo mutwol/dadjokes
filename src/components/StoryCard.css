@@ -1,0 +1,156 @@
+.story {
+  container-type: inline-size;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.story-card {
+  aspect-ratio: 9 / 14;
+  border-radius: var(--radius-l);
+}
+
+.story-inline {
+  border-radius: var(--radius-l);
+  min-height: 240px;
+}
+
+.story-full {
+  position: absolute;
+  inset: 0;
+}
+
+.story-bg-red {
+  background: var(--bg-red);
+  color: var(--on-red);
+  --hl: var(--highlighter);
+}
+.story-bg-navy {
+  background: var(--bg-navy);
+  color: var(--on-navy);
+  --hl: var(--highlighter);
+}
+.story-bg-yellow {
+  background: var(--bg-yellow);
+  color: var(--on-yellow);
+  --hl: #fff;
+}
+.story-bg-green {
+  background: var(--bg-green);
+  color: var(--on-green);
+  --hl: var(--highlighter);
+}
+.story-bg-denim {
+  background: var(--bg-denim);
+  color: var(--on-denim);
+  --hl: var(--highlighter);
+}
+
+.story-body {
+  padding: 10cqi 9cqi;
+  display: flex;
+  flex-direction: column;
+  gap: 7cqi;
+}
+
+.story-setup {
+  font-size: clamp(1.25rem, 8.6cqi, 3rem);
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+.story-punchline {
+  font-family: var(--font-hand);
+  font-size: clamp(1.375rem, 9.4cqi, 3.25rem);
+  line-height: 1.3;
+  color: var(--ink);
+  rotate: -2deg;
+  transform-origin: left center;
+  visibility: hidden;
+}
+
+.story-punchline span {
+  /* The highlighter: a background that wipes in from the left. */
+  background-image: linear-gradient(var(--hl), var(--hl));
+  background-repeat: no-repeat;
+  background-size: 100% 88%;
+  background-position: 0 60%;
+  padding: 0 0.2em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.story-punchline.is-revealed {
+  visibility: visible;
+}
+
+.story-punchline.is-revealed.is-animated span {
+  animation: highlighter 520ms var(--ease-out) both;
+}
+
+.story-punchline.is-revealed.is-animated {
+  animation: punch-in 380ms 160ms var(--ease-out) both;
+}
+
+@keyframes highlighter {
+  from {
+    background-size: 0% 88%;
+    color: transparent;
+  }
+  60% {
+    color: transparent;
+  }
+}
+
+@keyframes punch-in {
+  from {
+    rotate: -8deg;
+    scale: 0.9;
+  }
+}
+
+/* Image jokes */
+.story-image {
+  background: var(--ink);
+  color: #fff;
+}
+
+.story-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.story-image-empty {
+  margin: auto;
+  color: rgb(255 255 255 / 0.7);
+  font-weight: 700;
+}
+
+.story-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 24px 6cqi 7cqi;
+  background: linear-gradient(transparent, rgb(0 0 0 / 0.75));
+  font-size: clamp(1rem, 5cqi, 1.5rem);
+  font-weight: 700;
+}
+
+.story-inline .story-body {
+  padding: 32px 28px;
+  gap: 18px;
+}
+
+.story-inline .story-setup {
+  font-size: clamp(1.375rem, 5.6cqi, 2rem);
+}
+
+.story-inline .story-punchline {
+  font-size: clamp(1.5rem, 6.4cqi, 2.375rem);
+}

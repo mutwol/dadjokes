@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+/*
+ * Expose the design tokens (src/styles/tokens.css) to Tailwind, so utilities like
+ * `bg-tag-red`, `text-ink-soft` or `font-marker` use the same values as the
+ * component CSS. Component styles are plain CSS for now; new UI can use either.
+ */
+@theme inline {
+  --color-fridge: var(--fridge);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-tag-red: var(--tag-red);
+  --color-highlighter: var(--highlighter);
+  --color-lawn: var(--lawn);
+  --color-denim: var(--denim);
+  --color-navy: var(--navy);
+
+  --font-sans: var(--font-ui);
+  --font-marker: var(--font-hand);
+}

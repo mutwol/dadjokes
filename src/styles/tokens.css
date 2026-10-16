@@ -1,0 +1,53 @@
+/*
+ * Design tokens.
+ * Palette: fridge-door white, polo navy, name-tag red, highlighter yellow,
+ * lawn green and denim. Punchlines and name tags are "written" in marker;
+ * everything else is set in Atkinson Hyperlegible Next.
+ */
+:root {
+  --fridge: #f3f6f9;
+  --paper: #ffffff;
+  --ink: #1c2340;
+  --ink-soft: #4b5373;
+  --ink-faint: #8a90a8;
+  --line: #dde3ec;
+  --line-strong: #c7cfdc;
+
+  --tag-red: #e23b3b;
+  --tag-red-deep: #b82a2d;
+  --highlighter: #ffd43b;
+  --lawn: #2e9e58;
+  --denim: #3e5c9a;
+  --navy: #1c2340;
+
+  /* Joke backgrounds and the ink colour that sits on each. */
+  --bg-red: var(--tag-red);
+  --on-red: #ffffff;
+  --bg-navy: var(--navy);
+  --on-navy: #ffffff;
+  --bg-yellow: var(--highlighter);
+  --on-yellow: var(--ink);
+  --bg-green: var(--lawn);
+  --on-green: #ffffff;
+  --bg-denim: var(--denim);
+  --on-denim: #ffffff;
+
+  --font-ui: "Atkinson Hyperlegible Next Variable", system-ui, sans-serif;
+  --font-hand: "Permanent Marker", "Comic Sans MS", cursive;
+
+  /* Type scale (major third, 16px base). */
+  --step--1: 0.8125rem;
+  --step-0: 1rem;
+  --step-1: 1.25rem;
+  --step-2: 1.5625rem;
+  --step-3: 1.953rem;
+  --step-4: 2.441rem;
+
+  --radius-s: 8px;
+  --radius-m: 14px;
+  --radius-l: 22px;
+
+  --nav-h: 64px;
+  --focus: 0 0 0 3px var(--paper), 0 0 0 5px var(--denim);
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+}

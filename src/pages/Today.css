@@ -1,0 +1,372 @@
+.today {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.today-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0 6px;
+}
+
+.icon-btn {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+.icon-btn:hover {
+  background: rgb(28 35 64 / 0.06);
+}
+
+.today-grid {
+  display: grid;
+  gap: 24px;
+}
+
+.today-main {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.today-hi {
+  font-family: var(--font-hand);
+  color: var(--tag-red);
+  font-size: var(--step-1);
+  rotate: -1.5deg;
+  transform-origin: left;
+  margin-top: 8px;
+}
+
+.today-title {
+  font-size: var(--step-3);
+  margin-top: -10px;
+}
+
+/* Week rail: the WhatsApp status row, one ring per day */
+.week {
+  list-style: none;
+  margin: 0;
+  padding: 2px 0 4px;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(44px, 1fr));
+  gap: 4px;
+}
+
+.week-day {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-m);
+}
+
+.week-ring {
+  --ring: var(--line-strong);
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 3px solid var(--ring);
+  padding: 2px;
+  background: var(--paper);
+  color: var(--ink-faint);
+}
+
+.week-day.is-new .week-ring {
+  --ring: var(--tag-red);
+  border-width: 3px;
+  box-shadow: 0 0 0 3px rgb(226 59 59 / 0.18);
+}
+
+.week-day.is-seen .week-ring {
+  --ring: var(--line-strong);
+}
+
+.week-day.is-missed .week-ring {
+  border-style: dashed;
+}
+
+.week-day.is-future .week-ring {
+  border-style: dotted;
+  background: transparent;
+}
+
+.week-num {
+  font-weight: 800;
+  font-size: var(--step-0);
+}
+
+.week-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ink-faint);
+}
+
+.week-day.is-today .week-label {
+  color: var(--ink);
+}
+
+@media (max-width: 400px) {
+  .week-ring {
+    width: 44px;
+    height: 44px;
+    border-width: 2px;
+    padding: 1px;
+    --avatar-size: 36px;
+  }
+}
+
+/* Sealed joke: the hero before opening */
+.sealed {
+  border-radius: var(--radius-l);
+  padding: 28px 24px 24px;
+  display: grid;
+  gap: 22px;
+  justify-items: start;
+  min-height: 340px;
+  align-content: space-between;
+}
+
+.sealed-copy {
+  display: grid;
+  gap: 8px;
+  max-width: 28ch;
+}
+
+.sealed-copy h2 {
+  font-size: var(--step-2);
+}
+
+.sealed-copy p {
+  opacity: 0.9;
+}
+
+.sealed-open {
+  background: #fff;
+  color: var(--ink);
+  min-height: 52px;
+  padding: 0 24px;
+  font-size: var(--step-1);
+  justify-self: stretch;
+}
+
+.sealed-open:hover {
+  background: var(--fridge);
+}
+
+.story-bg-yellow .sealed-open {
+  background: var(--ink);
+  color: #fff;
+}
+
+@media (min-width: 600px) {
+  .sealed-open {
+    justify-self: start;
+  }
+}
+
+/* Opened joke */
+.opened {
+  display: grid;
+  gap: 18px;
+}
+
+.opened-card {
+  display: block;
+  text-decoration: none;
+  border-radius: var(--radius-l);
+}
+
+.opened-meta {
+  display: grid;
+  gap: 14px;
+}
+
+.byline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.byline-name {
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.byline-sub {
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+}
+
+.opened-stats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  color: var(--ink-soft);
+}
+
+.opened-stats strong {
+  color: var(--ink);
+}
+
+.opened-mine {
+  font-weight: 700;
+}
+
+.opened-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Next delivery */
+.next {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-m);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+}
+
+.next p {
+  flex: 1;
+}
+
+.next strong {
+  color: var(--ink);
+}
+
+.next-select select {
+  min-height: 40px;
+  border-radius: 999px;
+  border: 2px solid var(--line-strong);
+  background: var(--paper);
+  padding: 0 12px;
+  font-weight: 700;
+}
+
+.today-empty {
+  padding: 32px 24px;
+  border-radius: var(--radius-l);
+  border: 2px dashed var(--line-strong);
+  display: grid;
+  gap: 6px;
+}
+
+.today-empty p:first-child {
+  font-weight: 800;
+  font-size: var(--step-1);
+}
+
+/* Side panels */
+.today-aside {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.panel {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  padding: 18px;
+}
+
+.panel-title {
+  font-size: var(--step-0);
+}
+
+.panel-sub {
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+}
+
+.streak {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.streak-num {
+  font-family: var(--font-hand);
+  font-size: var(--step-4);
+  line-height: 1;
+  color: var(--tag-red);
+}
+
+.creator-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.creator-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.creator-list-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.creator-list-text .byline-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-small {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: var(--step--1);
+}
+
+@media (min-width: 900px) {
+  .today {
+    padding: 0 32px;
+  }
+
+  .today-top {
+    display: none;
+  }
+
+  .today-grid {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 40px;
+    padding-top: 36px;
+  }
+
+  .today-aside {
+    position: sticky;
+    top: 36px;
+  }
+
+  .opened {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}
