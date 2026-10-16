@@ -2,15 +2,6 @@ export type ReactionKind = "laugh" | "groan" | "facepalm" | "drum";
 
 export type JokeBackground = "red" | "navy" | "yellow" | "green" | "denim";
 
-export interface Comment {
-  id: string;
-  author: string;
-  handle: string;
-  body: string;
-  postedAt: string;
-  tone: JokeBackground;
-}
-
 /** A person can read (get the daily joke), write (submit jokes), or both. */
 export type Role = "reader" | "writer";
 

@@ -95,7 +95,8 @@ export class CurationService {
           sql`${similarity} >= ${COPY_THRESHOLD}`,
         ),
       )
-      .orderBy(sql`${similarity} desc`)
+      // On a tie, the older joke first: it's the likelier original.
+      .orderBy(sql`${similarity} desc`, asc(jokes.submittedAt))
       .limit(3);
     return rows.map(({ creatorId, creatorHandle, similarity: s, ...r }) => ({
       ...r,

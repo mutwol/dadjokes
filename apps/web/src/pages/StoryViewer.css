@@ -227,3 +227,10 @@
     display: none;
   }
 }
+
+/* The viewer is full-screen, outside the app shell, so it shows its own messages. */
+.viewer-toast {
+  position: absolute;
+  top: 72px;
+  bottom: auto;
+}

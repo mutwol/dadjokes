@@ -1,8 +1,9 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { FormEvent, PointerEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { ApiError, api, unwrap } from "../api/client.ts";
+import { ApiError, api, errorMessage, unwrap } from "../api/client.ts";
 import type { Joke } from "../api/client.ts";
+import { recordEvent, toggleReaction } from "../api/engagement.ts";
 import { Icon } from "../components/Icon.tsx";
 import { NameTag } from "../components/NameTag.tsx";
 import { ReactionBar } from "../components/Reactions.tsx";
@@ -40,7 +41,9 @@ export function StoryViewer() {
       : api.GET("/v1/jokes/{id}", { params: { path: { id } } });
     load.then(unwrap).then(
       (j) => {
-        if (!cancelled) setJoke(j);
+        if (cancelled) return;
+        setJoke(j);
+        if (!IS_DATE.test(id)) recordEvent(j.id, "replay");
       },
       (e: unknown) => {
         if (cancelled) return;
@@ -60,7 +63,8 @@ export function StoryViewer() {
 function Viewer({ joke }: { joke: Joke }) {
   const creator = joke.creator;
   const navigate = useNavigate();
-  const { react, myReaction, addComment, showToast } = useStore();
+  const { showToast, toast } = useStore();
+  const [myReaction, setMyReaction] = useState(joke.myReaction);
 
   // Image jokes are a single slide; text jokes are setup, then punchline.
   const steps = joke.kind === "text" ? 2 : 1;
@@ -121,13 +125,26 @@ function Viewer({ joke }: { joke: Joke }) {
     if (i === step && !isLast) setStep(i + 1);
   };
 
-  const sendReply = (e: FormEvent) => {
+  const react = async (kind: NonNullable<Joke["myReaction"]>) => {
+    try {
+      setMyReaction((await toggleReaction(joke.id, myReaction, kind)).myReaction);
+    } catch (e) {
+      showToast(errorMessage(e));
+    }
+  };
+
+  /** A reply is a comment on the joke, which its writer sees. */
+  const sendReply = async (e: FormEvent) => {
     e.preventDefault();
     const body = reply.trim();
     if (!body) return;
-    addComment(joke.id, body);
-    setReply("");
-    showToast(`Reply sent to ${creator.name.split(" ")[0]}`);
+    try {
+      unwrap(await api.POST("/v1/jokes/{id}/comments", { params: { path: { id: joke.id } }, body: { body } }));
+      setReply("");
+      showToast(`Reply sent to ${creator.name.split(" ")[0]}`);
+    } catch (err) {
+      showToast(errorMessage(err));
+    }
   };
 
   return (
@@ -197,13 +214,11 @@ function Viewer({ joke }: { joke: Joke }) {
             </button>
           ) : (
             <>
-              <ReactionBar
-                tone="dark"
-                selected={myReaction(joke.id)}
-                onReact={(k) => react(joke.id, k)}
-              />
+              {joke.isMine ? null : (
+                <ReactionBar tone="dark" selected={myReaction ?? undefined} onReact={(k) => void react(k)} />
+              )}
               <div className="viewer-reply-row">
-                <form className="viewer-reply" onSubmit={sendReply}>
+                <form className="viewer-reply" onSubmit={(e) => void sendReply(e)}>
                   <label className="visually-hidden" htmlFor="reply">
                     Reply to {creator.name}
                   </label>
@@ -228,6 +243,11 @@ function Viewer({ joke }: { joke: Joke }) {
             </>
           )}
         </div>
+        {toast ? (
+          <div className="toast viewer-toast" role="status">
+            {toast}
+          </div>
+        ) : null}
       </div>
     </div>
   );

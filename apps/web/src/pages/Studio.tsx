@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { api, errorMessage, unwrap } from "../api/client.ts";
-import type { StudioSummary, Submission } from "../api/client.ts";
+import type { StudioDaily, StudioSummary, Submission } from "../api/client.ts";
+import { DailyChart } from "../components/DailyChart.tsx";
 import { Icon } from "../components/Icon.tsx";
 import { StoryCard } from "../components/StoryCard.tsx";
 import { faceOf } from "../data/face.ts";
@@ -35,6 +36,7 @@ export function Studio() {
 
   const [attempt, setAttempt] = useState(0);
   const [summary, setSummary] = useState<StudioSummary | null>(null);
+  const [daily, setDaily] = useState<StudioDaily["data"] | null>(null);
 
   const fetchPage = useCallback(
     (cursor?: string) => api.GET("/v1/me/jokes", { params: { query: { limit: 20, cursor } } }).then(unwrap),
@@ -43,6 +45,12 @@ export function Studio() {
 
   useEffect(() => {
     let cancelled = false;
+    void api
+      .GET("/v1/me/studio/daily")
+      .then(unwrap)
+      .then((d) => {
+        if (!cancelled) setDaily(d.data);
+      }, () => undefined);
     void api
       .GET("/v1/me/studio")
       .then(unwrap)
@@ -121,6 +129,10 @@ export function Studio() {
         </div>
       </dl>
 
+      {daily && daily.some((d) => d.opens) ? (
+        <DailyChart title="Opens, last 14 days" unit="opens" days={daily.map((d) => ({ date: d.date, value: d.opens }))} />
+      ) : null}
+
       <section aria-labelledby="subs-title" className="studio-list">
         <h2 id="subs-title">Your jokes</h2>
         {failed ? (
@@ -147,7 +159,13 @@ export function Studio() {
                 </div>
                 <div className="sub-body">
                   <span className={`status status-${s.status.replace("_", "-")}`}>{STATUS[s.status]}</span>
-                  <p className="sub-setup">{s.setup ?? s.caption ?? "Image joke"}</p>
+                  <p className="sub-setup">
+                    {s.status === "delivered" && !s.removed ? (
+                      <Link to={`/joke/${s.id}`}>{s.setup ?? s.caption ?? "Image joke"}</Link>
+                    ) : (
+                      (s.setup ?? s.caption ?? "Image joke")
+                    )}
+                  </p>
                   <p className="sub-meta">{describe(s)}</p>
                 </div>
                 {s.canWithdraw ? (
@@ -180,7 +198,10 @@ function describe(s: Submission): string {
     case "scheduled":
       return `Goes out ${longDate(s.deliverOn!)}`;
     case "delivered":
-      return `Went out ${longDate(s.deliverOn!)}`;
+      if (s.removed) return `Went out ${longDate(s.deliverOn!)}. Taken down by the curators.`;
+      return s.stats?.reached
+        ? `Went out ${longDate(s.deliverOn!)} · ${compact(s.stats.opened)} of ${compact(s.stats.reached)} opened · ${compact(s.stats.reactions)} reactions · ${compact(s.stats.comments)} comments`
+        : `Went out ${longDate(s.deliverOn!)}`;
     case "declined":
       return `Not picked: ${DECLINE_COPY[s.declineReason ?? "other"]}${s.declineNote ? ` “${s.declineNote}”` : ""}`;
     case "withdrawn":

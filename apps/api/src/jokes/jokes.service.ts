@@ -5,7 +5,7 @@ import { decodeCursor, encodeCursor, isTimeCursor } from "../common/cursor";
 import { firstOpenDay } from "../common/dates";
 import { InjectDb } from "../db/db.module";
 import type { Db, Tx } from "../db/db.module";
-import { jokes, jokeTopics } from "../db/schema";
+import { comments, deliveries, jokes, jokeTopics, reactions } from "../db/schema";
 import type { Joke } from "../db/schema";
 import { assertTopicsExist } from "../db/topics";
 import { IMAGE_TYPES, MAX_IMAGE_BYTES, looksLike } from "../storage/images";
@@ -91,10 +91,10 @@ export class JokesService {
       .orderBy(desc(jokes.submittedAt), desc(jokes.id))
       .limit(q.limit + 1);
     const page = rows.slice(0, q.limit);
-    const topics = await this.topicsFor(page.map((r) => r.id));
+    const [topics, stats] = await Promise.all([this.topicsFor(page.map((r) => r.id)), this.statsFor(page)]);
     const last = page.at(-1);
     return {
-      data: page.map((r) => this.toSubmission(r, topics.get(r.id) ?? [])),
+      data: page.map((r) => ({ ...this.toSubmission(r, topics.get(r.id) ?? []), stats: stats.get(r.id) ?? null })),
       nextCursor:
         rows.length > q.limit && last ? encodeCursor({ t: last.submittedAt.toISOString(), id: last.id }) : null,
     };
@@ -102,7 +102,8 @@ export class JokesService {
 
   async getMine(creatorId: string, id: string): Promise<Submission> {
     const row = await this.findMine(this.db, creatorId, id);
-    return this.toSubmission(row, (await this.topicsFor([id])).get(id) ?? []);
+    const [topics, stats] = await Promise.all([this.topicsFor([id]), this.statsFor([row])]);
+    return { ...this.toSubmission(row, topics.get(id) ?? []), stats: stats.get(id) ?? null };
   }
 
   /** Takes a joke out of review, or off the schedule if its day hasn't started anywhere yet. */
@@ -130,6 +131,40 @@ export class JokesService {
 
   toSubmission(r: Joke, topics: string[]): Submission {
     return toSubmission(r, topics, (key) => this.storage.publicUrl(key));
+  }
+
+  /** Reach and engagement for jokes that have gone out (excluding the writer's own views). */
+  private async statsFor(rows: Joke[]) {
+    const ids = rows.filter((r) => r.status === "delivered").map((r) => r.id);
+    const out = new Map<string, NonNullable<Submission["stats"]>>();
+    if (!ids.length) return out;
+    const [reach, reacts, talk] = await Promise.all([
+      this.db
+        .select({ id: deliveries.jokeId, reached: sql<number>`count(*)::int`, opened: sql<number>`count(${deliveries.openedAt})::int` })
+        .from(deliveries)
+        .where(inArray(deliveries.jokeId, ids))
+        .groupBy(deliveries.jokeId),
+      this.db
+        .select({ id: reactions.jokeId, n: sql<number>`count(*)::int` })
+        .from(reactions)
+        .where(inArray(reactions.jokeId, ids))
+        .groupBy(reactions.jokeId),
+      this.db
+        .select({ id: comments.jokeId, n: sql<number>`count(*) filter (where ${comments.deletedAt} is null)::int` })
+        .from(comments)
+        .where(inArray(comments.jokeId, ids))
+        .groupBy(comments.jokeId),
+    ]);
+    for (const id of ids) {
+      const r = reach.find((x) => x.id === id);
+      out.set(id, {
+        reached: r?.reached ?? 0,
+        opened: r?.opened ?? 0,
+        reactions: reacts.find((x) => x.id === id)?.n ?? 0,
+        comments: talk.find((x) => x.id === id)?.n ?? 0,
+      });
+    }
+    return out;
   }
 
   /** The image must be this writer's own upload, finished, and really an image of the declared type. */
@@ -189,5 +224,7 @@ export function toSubmission(r: Joke, topics: string[], mediaUrl: (key: string) 
     declineReason: r.declineReason,
     declineNote: r.declineNote,
     canWithdraw: canWithdraw(r),
+    removed: r.removedAt !== null,
+    stats: null,
   };
 }

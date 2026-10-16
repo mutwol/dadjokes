@@ -215,6 +215,9 @@ export const jokes = pgTable(
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
     declineReason: declineReasonEnum("decline_reason"),
     declineNote: text("decline_note"),
+    /** Taken down after it went out (e.g. a reported copy). Hidden from readers from then on. */
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+    removedBy: uuid("removed_by").references(() => users.id, { onDelete: "set null" }),
     updatedAt: updatedAt(),
   },
   (t) => [
@@ -285,10 +288,114 @@ export const deliveries = pgTable(
   ],
 );
 
+export const reactionKindEnum = pgEnum("reaction_kind", ["laugh", "groan", "facepalm", "drum"]);
+
+/** One reaction per reader per joke; reacting again replaces it. */
+export const reactions = pgTable(
+  "reactions",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    jokeId: uuid("joke_id")
+      .notNull()
+      .references(() => jokes.id, { onDelete: "cascade" }),
+    kind: reactionKindEnum("kind").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.jokeId] }), index("reactions_joke_idx").on(t.jokeId, t.kind)],
+);
+
+export const comments = pgTable(
+  "comments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    jokeId: uuid("joke_id")
+      .notNull()
+      .references(() => jokes.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    createdAt: createdAt(),
+    /** Deleted by its author, or removed by a curator. Kept for reports and moderation history. */
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    deletedBy: uuid("deleted_by").references(() => users.id, { onDelete: "set null" }),
+  },
+  (t) => [
+    index("comments_joke_idx").on(t.jokeId, t.createdAt),
+    check("comments_body_length", sql`char_length(${t.body}) between 1 and 280`),
+  ],
+);
+
+export const reportReasonEnum = pgEnum("report_reason", ["copied", "offensive", "spam", "other"]);
+export const reportResolutionEnum = pgEnum("report_resolution", ["dismissed", "removed"]);
+
+/** A reader flagging a joke or a comment for curators. One report per person per thing. */
+export const reports = pgTable(
+  "reports",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    reporterId: uuid("reporter_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    jokeId: uuid("joke_id").references(() => jokes.id, { onDelete: "cascade" }),
+    commentId: uuid("comment_id").references(() => comments.id, { onDelete: "cascade" }),
+    reason: reportReasonEnum("reason").notNull(),
+    note: text("note"),
+    createdAt: createdAt(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolvedBy: uuid("resolved_by").references(() => users.id, { onDelete: "set null" }),
+    resolution: reportResolutionEnum("resolution"),
+  },
+  (t) => [
+    check("reports_one_target", sql`(${t.jokeId} is null) <> (${t.commentId} is null)`),
+    uniqueIndex("reports_joke_once_key").on(t.reporterId, t.jokeId).where(sql`${t.jokeId} is not null`),
+    uniqueIndex("reports_comment_once_key").on(t.reporterId, t.commentId).where(sql`${t.commentId} is not null`),
+    index("reports_open_idx").on(t.createdAt).where(sql`${t.resolvedAt} is null`),
+  ],
+);
+
+export const jokeEventTypeEnum = pgEnum("joke_event_type", ["replay", "share"]);
+
+/** Things readers do with a joke besides opening it, sent in batches by the app. */
+export const jokeEvents = pgTable(
+  "joke_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    jokeId: uuid("joke_id")
+      .notNull()
+      .references(() => jokes.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    type: jokeEventTypeEnum("type").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [index("joke_events_joke_idx").on(t.jokeId, t.occurredAt)],
+);
+
+/** Per-joke, per-day totals for Studio, rebuilt by the worker from the tables above. */
+export const jokeStatsDaily = pgTable(
+  "joke_stats_daily",
+  {
+    jokeId: uuid("joke_id")
+      .notNull()
+      .references(() => jokes.id, { onDelete: "cascade" }),
+    day: date("day", { mode: "string" }).notNull(),
+    opens: integer("opens").notNull().default(0),
+    replays: integer("replays").notNull().default(0),
+    shares: integer("shares").notNull().default(0),
+    reactions: integer("reactions").notNull().default(0),
+    comments: integer("comments").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.jokeId, t.day] })],
+);
+
 export type Role = (typeof roleEnum.enumValues)[number];
 export type Tone = (typeof toneEnum.enumValues)[number];
 export type User = typeof users.$inferSelect;
 export type Joke = typeof jokes.$inferSelect;
 export type JokeStatus = (typeof jokeStatusEnum.enumValues)[number];
 export type Delivery = typeof deliveries.$inferSelect;
+export type Comment = typeof comments.$inferSelect;
 export type DeclineReason = (typeof declineReasonEnum.enumValues)[number];

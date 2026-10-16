@@ -2,6 +2,7 @@ import { ApiError, createApiClient, unwrap } from "@daddy-jokes/contracts";
 
 export { ApiError, unwrap };
 export type {
+  Comment,
   CompleteOnboardingRequest,
   CreateJokeRequest,
   Creator,
@@ -9,9 +10,12 @@ export type {
   CurationCalendar,
   DeliveryCard,
   Joke,
+  JokeStats,
   Me,
   PossibleCopy,
   QueueItem,
+  ReportedItem,
+  StudioDaily,
   Session,
   StudioSummary,
   Submission,
@@ -32,6 +36,12 @@ let refreshing: Promise<string | null> | null = null;
 export function setAccessToken(token: string | null) {
   accessToken = token;
 }
+
+export function getAccessToken() {
+  return accessToken;
+}
+
+export const apiUrl = (path: string) => `${BASE_URL}${path}`;
 
 /** Gets a new access token from the refresh cookie. Concurrent callers share one request. */
 export function refreshAccessToken(): Promise<string | null> {

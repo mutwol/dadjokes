@@ -5,6 +5,7 @@ import { queueRoot } from "./app.module";
 import { AppConfigModule } from "./config/config.module";
 import { DbModule } from "./db/db.module";
 import { DeliveriesWorkerModule } from "./deliveries/deliveries.module";
+import { EngagementWorkerModule } from "./engagement/engagement.module";
 import { MailWorkerModule } from "./mail/mail.module";
 import { StorageCoreModule } from "./storage/storage.module";
 
@@ -13,7 +14,7 @@ import { StorageCoreModule } from "./storage/storage.module";
  * Sends email and delivers the daily joke every few minutes.
  */
 @Module({
-  imports: [AppConfigModule, DbModule, queueRoot, StorageCoreModule, MailWorkerModule, DeliveriesWorkerModule],
+  imports: [AppConfigModule, DbModule, queueRoot, StorageCoreModule, MailWorkerModule, DeliveriesWorkerModule, EngagementWorkerModule],
 })
 class WorkerModule {}
 

@@ -213,7 +213,6 @@ function SealedJoke({ card }: { card: DeliveryCard }) {
 }
 
 function OpenedJoke({ jokeId }: { jokeId: string }) {
-  const { reactionsFor, commentsFor, myReaction } = useStore();
   const [joke, setJoke] = useState<Joke | null>(null);
 
   useEffect(() => {
@@ -230,9 +229,8 @@ function OpenedJoke({ jokeId }: { jokeId: string }) {
   }, [jokeId]);
 
   if (!joke) return <div className="today-skeleton" aria-busy="true" />;
-  const counts = reactionsFor(joke);
-  const mine = myReaction(joke.id);
-  const mineMeta = REACTIONS.find((r) => r.kind === mine);
+  const counts = joke.stats.reactions;
+  const mineMeta = REACTIONS.find((r) => r.kind === joke.myReaction);
 
   return (
     <article className="opened">
@@ -255,7 +253,7 @@ function OpenedJoke({ jokeId }: { jokeId: string }) {
             <strong>{compact(joke.stats.views)}</strong> views
           </li>
           <li>
-            <strong>{joke.stats.comments + commentsFor(joke).length}</strong> comments
+            <strong>{joke.stats.comments}</strong> comments
           </li>
         </ul>
         <p className="opened-mine">

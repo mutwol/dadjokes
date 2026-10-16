@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { and, desc, eq, gte, inArray, isNotNull, lte, ne, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull, lte, ne, sql } from "drizzle-orm";
 import { AppError, notFound } from "../common/errors";
 import { addDays, latestDateNow, localDate, localHour, zonedInstant } from "../common/dates";
 import { InjectDb } from "../db/db.module";
@@ -67,11 +67,11 @@ export class DeliveriesService {
           select c.user_id, c.local_date, coalesce(
             case when c.joke_origin = 'local' then (
               select j.id from ${jokes} j
-              where j.deliver_on = c.local_date and j.region = c.country and j.status in ('scheduled', 'delivered')
+              where j.deliver_on = c.local_date and j.region = c.country and j.status in ('scheduled', 'delivered') and j.removed_at is null
             ) end,
             (
               select j.id from ${jokes} j
-              where j.deliver_on = c.local_date and j.region is null and j.status in ('scheduled', 'delivered')
+              where j.deliver_on = c.local_date and j.region is null and j.status in ('scheduled', 'delivered') and j.removed_at is null
             )
           ) as joke_id
           from candidates c
@@ -169,6 +169,8 @@ export class DeliveriesService {
       .from(deliveries)
       .where(and(eq(deliveries.userId, userId), eq(deliveries.localDate, date)));
     if (!d) throw notFound("Joke for that day");
+    const [{ removedAt }] = await this.db.select({ removedAt: jokes.removedAt }).from(jokes).where(eq(jokes.id, d.jokeId));
+    if (removedAt) throw new AppError(410, "joke_removed", "This joke was taken down.");
     if (!d.openedAt) {
       if (d.expiresAt <= now) {
         throw new AppError(410, "joke_expired", "This joke has gone. Unopened jokes disappear after a day.");
@@ -183,10 +185,11 @@ export class DeliveriesService {
   }
 
   /**
-   * A joke for a reader. Readers can see jokes they've opened; writers their
-   * own; curators any. Anything else is a 404, so ids don't leak what exists.
+   * Who may see a joke: readers once they've opened it, its writer, and
+   * curators. Taken-down jokes are hidden from readers. Anything else is a 404,
+   * so ids don't reveal what exists.
    */
-  async getJoke(viewerId: string, id: string, opts = { skipAccessCheck: false }): Promise<ReaderJoke> {
+  async access(viewerId: string, id: string, opts = { skipOpenedCheck: false }) {
     const [row] = await this.db
       .select({
         joke: jokes,
@@ -204,8 +207,15 @@ export class DeliveriesService {
       .innerJoin(users, eq(users.id, jokes.creatorId))
       .where(eq(jokes.id, id));
     const isMine = row?.joke.creatorId === viewerId;
-    if (!row || !(opts.skipAccessCheck || row.opened || isMine || row.staff)) throw notFound("Joke");
+    const privileged = isMine || Boolean(row?.staff);
+    if (!row || !(privileged || ((opts.skipOpenedCheck || row.opened) && !row.joke.removedAt))) throw notFound("Joke");
+    return { ...row, isMine };
+  }
 
+  /** A joke as the reader sees it, with stats. */
+  async getJoke(viewerId: string, id: string, opts = { skipAccessCheck: false }): Promise<ReaderJoke> {
+    const row = await this.access(viewerId, id, { skipOpenedCheck: opts.skipAccessCheck });
+    const isMine = row.isMine;
     const [topics, stats] = await Promise.all([this.jokes.topicsFor([id]), this.statsFor([id], viewerId)]);
     const j = row.joke;
     return {
@@ -289,7 +299,14 @@ export class DeliveriesService {
       .from(deliveries)
       .innerJoin(jokes, eq(jokes.id, deliveries.jokeId))
       .innerJoin(users, eq(users.id, jokes.creatorId))
-      .where(and(eq(deliveries.userId, userId), gte(deliveries.localDate, from), lte(deliveries.localDate, to)))
+      .where(
+        and(
+          eq(deliveries.userId, userId),
+          gte(deliveries.localDate, from),
+          lte(deliveries.localDate, to),
+          isNull(jokes.removedAt),
+        ),
+      )
       .orderBy(desc(deliveries.localDate));
     return rows.map((r) => toCard(r.d, r, now));
   }

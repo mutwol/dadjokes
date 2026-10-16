@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { api, errorMessage, refreshAccessToken, setAccessToken, unwrap } from "../api/client.ts";
 import type { Me, Session } from "../api/client.ts";
-import type { Comment, NotificationState, ReactionKind, Role } from "../data/types.ts";
+import type { NotificationState, Role } from "../data/types.ts";
 import { Ctx } from "./useStore.ts";
 import type { AuthStatus, Store } from "./useStore.ts";
 
@@ -22,8 +22,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [account, setAccountState] = useState<Me | null>(null);
   const [notifications, setNotificationsState] = useState<NotificationState>(loadNotifications);
-  const [reactions, setReactions] = useState<Record<string, ReactionKind>>({});
-  const [comments, setComments] = useState<Record<string, Comment[]>>({});
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<number | undefined>(undefined);
 
@@ -118,15 +116,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const react = useCallback((jokeId: string, kind: ReactionKind) => {
-    setReactions((prev) => {
-      const next = { ...prev };
-      if (next[jokeId] === kind) delete next[jokeId];
-      else next[jokeId] = kind;
-      return next;
-    });
-  }, []);
-
   const value = useMemo<Store>(
     () => ({
       status,
@@ -139,29 +128,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       notifications,
       setNotifications,
 
-      myReaction: (id) => reactions[id],
-      react,
-      reactionsFor: (joke) => {
-        const mine = reactions[joke.id];
-        const base = joke.stats.reactions;
-        return mine ? { ...base, [mine]: base[mine] + 1 } : base;
-      },
-      commentsFor: (joke) => comments[joke.id] ?? [],
-      addComment: (jokeId, body) =>
-        setComments((prev) => ({
-          ...prev,
-          [jokeId]: [
-            {
-              id: `local-${Date.now()}`,
-              author: account?.name ?? "You",
-              handle: account?.handle ?? "you",
-              body,
-              postedAt: "now",
-              tone: account?.tone ?? "navy",
-            },
-            ...(prev[jokeId] ?? []),
-          ],
-        })),
       deliveryHour: account?.preferences.deliveryHour ?? DEFAULT_DELIVERY_HOUR,
       setDeliveryHour,
       toast,
@@ -176,9 +142,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       signOut,
       notifications,
       setNotifications,
-      reactions,
-      react,
-      comments,
       setDeliveryHour,
       toast,
       showToast,

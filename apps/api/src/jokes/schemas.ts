@@ -63,6 +63,16 @@ export const SubmissionSchema = named(
     declineReason: DeclineReason.nullable(),
     declineNote: z.string().nullable(),
     canWithdraw: z.boolean(),
+    removed: z.boolean().describe("Taken down by curators after it went out."),
+    stats: z
+      .object({
+        reached: z.number().int(),
+        opened: z.number().int(),
+        reactions: z.number().int(),
+        comments: z.number().int(),
+      })
+      .nullable()
+      .describe("Once it has gone out."),
   }),
   "One of my jokes, with where it is in curation.",
 );

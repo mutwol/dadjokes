@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { ApiError, api, errorMessage, unwrap } from "../api/client.ts";
-import type { CurationCalendar, QueueItem } from "../api/client.ts";
+import type { CurationCalendar, QueueItem, ReportedItem } from "../api/client.ts";
 import { Avatar } from "../components/Avatar.tsx";
 import { StoryCard } from "../components/StoryCard.tsx";
 import { faceOf } from "../data/face.ts";
@@ -25,6 +25,108 @@ function firstFreeDay(days: Calendar, region: string | null): string | undefined
 }
 
 export function Curate() {
+  const [tab, setTab] = useState<"queue" | "reports">("queue");
+  return (
+    <div className="curate">
+      <header className="curate-head">
+        <h1>Curation</h1>
+        <div className="segmented curate-tabs" role="tablist" aria-label="Curation">
+          {(["queue", "reports"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={tab === t}
+              className={`segmented-opt${tab === t ? " is-on" : ""}`}
+              onClick={() => setTab(t)}
+            >
+              {t === "queue" ? "Review queue" : "Reports"}
+            </button>
+          ))}
+        </div>
+      </header>
+      {tab === "queue" ? <Queue /> : <Reports />}
+    </div>
+  );
+}
+
+const REASON_LABEL: Record<string, string> = {
+  copied: "copied",
+  offensive: "offensive",
+  spam: "spam",
+  other: "other",
+};
+
+function Reports() {
+  const { showToast } = useStore();
+  const [items, setItems] = useState<ReportedItem[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .GET("/v1/curation/reports")
+      .then(unwrap)
+      .then((r) => {
+        if (!cancelled) setItems(r.data);
+      }, () => showToast("Couldn't load reports."));
+    return () => {
+      cancelled = true;
+    };
+  }, [showToast]);
+
+  const resolve = async (item: ReportedItem, action: "dismiss" | "remove") => {
+    const target = item.commentId ? { commentId: item.commentId } : { jokeId: item.jokeId };
+    const { response } = await api.POST("/v1/curation/reports/resolve", { body: { ...target, action } });
+    if (!response.ok) return showToast("Couldn't resolve that. Try again.");
+    setItems((prev) => prev?.filter((i) => i !== item) ?? null);
+    showToast(action === "remove" ? `${item.target === "joke" ? "Joke" : "Comment"} taken down.` : "Left up. Reports closed.");
+  };
+
+  if (items !== null && !items.length) {
+    return (
+      <div className="curate-empty">
+        <p>No open reports. Everyone's behaving, or at least groaning politely.</p>
+      </div>
+    );
+  }
+  return (
+    <ul className="curate-list" aria-busy={items === null}>
+      {(items ?? []).map((item) => (
+        <li key={`${item.jokeId}-${item.commentId ?? ""}`} className="qcard">
+          <p className="qcard-muted">
+            {item.target === "joke" ? "Joke" : "Comment"} by @{item.authorHandle} · {item.reports}{" "}
+            {item.reports === 1 ? "report" : "reports"} since {shortDate(item.firstReportedAt.slice(0, 10))}
+          </p>
+          <p className="qcard-setup">“{item.preview}”</p>
+          <div className="report-reasons">
+            {Object.entries(item.reasons).map(([reason, n]) => (
+              <span key={reason} className="report-reason">
+                {REASON_LABEL[reason] ?? reason} × {n}
+              </span>
+            ))}
+          </div>
+          {item.notes.length ? (
+            <ul className="report-notes">
+              {item.notes.map((n, i) => (
+                <li key={i}>{n}</li>
+              ))}
+            </ul>
+          ) : null}
+          <div className="qcard-buttons">
+            <button type="button" className="btn btn-primary btn-small" onClick={() => void resolve(item, "remove")}>
+              Take it down
+            </button>
+            <button type="button" className="btn btn-quiet btn-small" onClick={() => void resolve(item, "dismiss")}>
+              Leave it up
+            </button>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Queue() {
   const { showToast } = useStore();
   const [items, setItems] = useState<QueueItem[] | null>(null);
   const [waiting, setWaiting] = useState(0);
@@ -78,11 +180,10 @@ export function Curate() {
   };
 
   return (
-    <div className="curate">
-      <header className="curate-head">
-        <h1>Curation</h1>
-        <p>{items === null ? "Loading the queue…" : `${waiting} ${waiting === 1 ? "joke" : "jokes"} waiting for review`}</p>
-      </header>
+    <>
+      <p className="curate-count">
+        {items === null ? "Loading the queue…" : `${waiting} ${waiting === 1 ? "joke" : "jokes"} waiting for review`}
+      </p>
 
       {calendar ? <CalendarStrip calendar={calendar} /> : null}
 
@@ -105,7 +206,7 @@ export function Curate() {
           Show more
         </button>
       ) : null}
-    </div>
+    </>
   );
 }
 

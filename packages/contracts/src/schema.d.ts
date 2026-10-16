@@ -419,6 +419,161 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/jokes/{id}/reaction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** React to a joke. Reacting again replaces your reaction. */
+        put: operations["react"];
+        post?: never;
+        /** Take back your reaction */
+        delete: operations["unreact"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/jokes/{id}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Comments on a joke, newest first */
+        get: operations["listComments"];
+        put?: never;
+        /** Comment on a joke */
+        post: operations["addComment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/jokes/{id}/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Live counts for a joke (text/event-stream) */
+        get: operations["liveStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/comments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete my comment (curators: any comment) */
+        delete: operations["deleteComment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Flag a joke or comment for the curators. Safe to repeat. */
+        post: operations["report"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record replays and shares, in batches */
+        post: operations["recordEvents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/studio/daily": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Opens, reactions and comments on my jokes, last 14 days */
+        get: operations["getStudioDaily"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/curation/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Open reports, grouped by what was reported */
+        get: operations["listReports"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/curation/reports/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss reports, or take the joke or comment down */
+        post: operations["resolveReports"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/email/start": {
         parameters: {
             query?: never;
@@ -710,6 +865,15 @@ export interface components {
             declineReason: "possible_copy" | "not_a_dad_joke" | "offensive" | "unclear" | "other" | null;
             declineNote: string | null;
             canWithdraw: boolean;
+            /** @description Taken down by curators after it went out. */
+            removed: boolean;
+            /** @description Once it has gone out. */
+            stats: {
+                reached: number;
+                opened: number;
+                reactions: number;
+                comments: number;
+            } | null;
         };
         SubmissionPage: {
             data: components["schemas"]["Submission"][];
@@ -820,6 +984,103 @@ export interface components {
             opened: number;
             tipsKes: number;
         };
+        ReactRequest: {
+            /** @enum {string} */
+            kind: "laugh" | "groan" | "facepalm" | "drum";
+        };
+        JokeStats: {
+            views: number;
+            reactions: components["schemas"]["ReactionCounts"];
+            comments: number;
+            /** @enum {string|null} */
+            myReaction: "laugh" | "groan" | "facepalm" | "drum" | null;
+        };
+        Comment: {
+            /** Format: uuid */
+            id: string;
+            body: string;
+            /** Format: date-time */
+            createdAt: string;
+            author: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                handle: string;
+                /** @enum {string} */
+                tone: "red" | "navy" | "yellow" | "green" | "denim";
+            };
+            isMine: boolean;
+            canDelete: boolean;
+        };
+        CommentPage: {
+            data: components["schemas"]["Comment"][];
+            nextCursor: string | null;
+        };
+        CreateCommentRequest: {
+            body: string;
+        };
+        CreateReportRequest: {
+            /** Format: uuid */
+            jokeId?: string;
+            /** Format: uuid */
+            commentId?: string;
+            /** @enum {string} */
+            reason: "copied" | "offensive" | "spam" | "other";
+            note?: string;
+        };
+        EventsRequest: {
+            events: {
+                /** Format: uuid */
+                jokeId: string;
+                /** @enum {string} */
+                type: "replay" | "share";
+                /**
+                 * Format: date-time
+                 * @description When it happened. Defaults to now; clamped to the last day.
+                 */
+                at?: string;
+            }[];
+        };
+        ReportedItem: {
+            /** @enum {string} */
+            target: "joke" | "comment";
+            /** Format: uuid */
+            jokeId: string;
+            /** Format: uuid */
+            commentId: string | null;
+            preview: string;
+            authorHandle: string;
+            reports: number;
+            reasons: {
+                [key: string]: number;
+            };
+            notes: string[];
+            /** Format: date-time */
+            firstReportedAt: string;
+        };
+        ReportedItemList: {
+            data: components["schemas"]["ReportedItem"][];
+        };
+        ResolveReportsRequest: {
+            /** Format: uuid */
+            jokeId?: string;
+            /** Format: uuid */
+            commentId?: string;
+            /** @enum {string} */
+            action: "dismiss" | "remove";
+        };
+        EventsAccepted: {
+            accepted: number;
+        };
+        StudioDaily: {
+            data: {
+                /** Format: date */
+                date: string;
+                opens: number;
+                reactions: number;
+                comments: number;
+            }[];
+        };
         JokeCreator: {
             /** Format: uuid */
             id: string;
@@ -853,6 +1114,15 @@ export interface components {
             declineReason: "possible_copy" | "not_a_dad_joke" | "offensive" | "unclear" | "other" | null;
             declineNote: string | null;
             canWithdraw: boolean;
+            /** @description Taken down by curators after it went out. */
+            removed: boolean;
+            /** @description Once it has gone out. */
+            stats: {
+                reached: number;
+                opened: number;
+                reactions: number;
+                comments: number;
+            } | null;
             creator: components["schemas"]["JokeCreator"];
             /** Format: date-time */
             reviewedAt: string | null;
@@ -1737,6 +2007,264 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Problem"];
                 };
+            };
+        };
+    };
+    react: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReactRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JokeStats"];
+                };
+            };
+            /** @description It's your own joke */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    unreact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JokeStats"];
+                };
+            };
+        };
+    };
+    listComments: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentPage"];
+                };
+            };
+        };
+    };
+    addComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCommentRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Comment"];
+                };
+            };
+        };
+    };
+    liveStats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Each `stats` event's data */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": components["schemas"]["JokeStats"];
+                };
+            };
+        };
+    };
+    deleteComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    report: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReportRequest"];
+            };
+        };
+        responses: {
+            /** @description Received */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    recordEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventsAccepted"];
+                };
+            };
+        };
+    };
+    getStudioDaily: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudioDaily"];
+                };
+            };
+        };
+    };
+    listReports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportedItemList"];
+                };
+            };
+        };
+    };
+    resolveReports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveReportsRequest"];
+            };
+        };
+        responses: {
+            /** @description Resolved */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

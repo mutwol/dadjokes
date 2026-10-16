@@ -185,3 +185,45 @@
     max-width: 640px;
   }
 }
+
+.detail-joke-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.detail-report,
+.link-btn {
+  font: inherit;
+  font-size: var(--step--1);
+  font-weight: 700;
+  color: var(--ink-soft);
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  justify-self: start;
+}
+
+.link-btn:hover,
+.detail-report:hover {
+  color: var(--ink);
+}
+
+.comment-main {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.comment-actions {
+  display: flex;
+  gap: 14px;
+}
+
+.detail-mine-note {
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+}

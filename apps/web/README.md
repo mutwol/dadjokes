@@ -25,8 +25,8 @@ and the worker. Vite proxies `/v1` to the API on port 3000, so no CORS setup is 
 
 Real, through the API: sign-in, onboarding, the account, roles, preferences, writers and
 subscriptions, submitting jokes (text or image) and Studio, curation (`/curate`, for curators),
-Today, opening the daily joke and joke detail. Reactions and comments are still kept in the
-browser until the engagement API is built; tips are not connected yet.
+Today, opening the daily joke and joke detail, reactions, comments (with live counts), reports,
+sharing and Studio stats. Tips are not connected yet.
 
 To try curation, sign in as `curator@daddyjokes.local` (seeded; the code is in the API log).
 

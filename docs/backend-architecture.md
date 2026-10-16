@@ -69,6 +69,14 @@ packages/contracts     openapi.json + generated types + typed client
 | GET | `/v1/curation/queue` | Jokes waiting for review with possible copies (curators) |
 | GET | `/v1/curation/calendar` | Which days have a joke, everywhere and per region |
 | POST | `/v1/curation/jokes/{id}/schedule` · `/decline` | Pick a day · decline with a reason |
+| PUT · DELETE | `/v1/jokes/{id}/reaction` | React (one per reader, replaceable) · take it back |
+| GET · POST | `/v1/jokes/{id}/comments` | Comments, newest first · add one |
+| DELETE | `/v1/comments/{id}` | Delete my comment (curators: any) |
+| GET | `/v1/jokes/{id}/live` | Server-sent events with live counts |
+| POST | `/v1/reports` | Flag a joke or comment |
+| POST | `/v1/events` | Batched replays and shares |
+| GET | `/v1/me/studio/daily` | Opens, reactions, comments per day (14 days) |
+| GET · POST | `/v1/curation/reports` · `/resolve` | Open reports grouped by target · dismiss or take down |
 | GET | `/health` | Postgres and Redis status |
 
 Interactive docs run at `http://localhost:3000/docs` in development.
@@ -112,9 +120,18 @@ a day already taken by a real (non-seed) joke is left alone and the test joke go
   first bytes match the type. `STORAGE_DRIVER=local` (disk, served at `/media`) or `s3` (S3, R2,
   MinIO). Orphaned uploads (never submitted) can be cleaned up with a bucket lifecycle rule on `jokes/`.
 
-**Phase 3: engagement and stats**
-- Reactions (one per person per joke), comments, reports, an SSE stream for live counts.
-- `POST /v1/events` for batched view events, rolled up into `joke_stats_daily` for Studio.
+**Phase 3: engagement and stats (done)**
+- `reactions` (one per reader per joke), `comments` (soft-deleted), `reports` (one per person per
+  joke or comment), `joke_events` (replays, shares). Only people who can see a joke (opened it,
+  wrote it, or curate) can react, comment or report; writers can't react to their own jokes.
+- Live counts: `GET /v1/jokes/:id/live` is a server-sent events stream. Any change publishes a
+  tiny "changed" message on Redis (`dj:joke:<id>`), so it works across several API processes;
+  each stream then reloads the counts, folding bursts into one update. The web app reads it with
+  fetch, since EventSource can't send the Authorization header.
+- Curators see open reports grouped by what was reported and can dismiss them or take the joke
+  or comment down. A taken-down joke (`removed_at`) disappears for readers and stops being delivered.
+- The worker rebuilds `joke_stats_daily` every 15 minutes (and at start) for the last two days,
+  recomputing rather than incrementing, so reruns are harmless. Studio's chart reads it.
 
 **Phase 4: notifications and money**
 - Web push subscriptions and the activity feed.

@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { api, unwrap } from "../api/client.ts";
-import type { Joke } from "../api/client.ts";
+import { api, errorMessage, unwrap } from "../api/client.ts";
+import type { Comment, Joke } from "../api/client.ts";
+import { shareJoke, toggleReaction } from "../api/engagement.ts";
+import { useLiveStats } from "../api/useLiveStats.ts";
 import { Avatar } from "../components/Avatar.tsx";
 import { Icon } from "../components/Icon.tsx";
 import { GroanMeter, ReactionBar } from "../components/Reactions.tsx";
 import { StoryCard } from "../components/StoryCard.tsx";
-import { longDate } from "../data/dates.ts";
+import { longDate, timeAgo } from "../data/dates.ts";
 import { faceOf } from "../data/face.ts";
 import { compact, totalReactions } from "../data/reactions.ts";
 import { useStore } from "../state/useStore.ts";
@@ -47,23 +49,87 @@ export function JokeDetail() {
 
 function Detail({ joke }: { joke: Joke }) {
   const navigate = useNavigate();
-  const { reactionsFor, myReaction, react, commentsFor, addComment, showToast, account } = useStore();
+  const { showToast, account } = useStore();
+  const [stats, setStats] = useLiveStats(joke.id, { ...joke.stats, myReaction: joke.myReaction });
+  const [comments, setComments] = useState<Comment[] | null>(null);
+  const [moreCursor, setMoreCursor] = useState<string | null>(null);
+  const [posting, setPosting] = useState(false);
   const [draft, setDraft] = useState("");
   const [tipOpen, setTipOpen] = useState(false);
   const [tip, setTip] = useState(50);
   const [subscribed, setSubscribed] = useState(joke.creator.isSubscribed);
 
   const creator = joke.creator;
-  const counts = reactionsFor(joke);
-  const comments = commentsFor(joke);
+  const counts = stats.reactions;
   const first = creator.name.split(" ")[0];
 
-  const post = (e: FormEvent) => {
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .GET("/v1/jokes/{id}/comments", { params: { path: { id: joke.id }, query: { limit: 20 } } })
+      .then(unwrap)
+      .then((page) => {
+        if (cancelled) return;
+        setComments(page.data);
+        setMoreCursor(page.nextCursor);
+      }, () => undefined);
+    return () => {
+      cancelled = true;
+    };
+    // Reload when the live count changes, so other people's comments show up.
+  }, [joke.id, stats.comments]);
+
+  const loadMore = async () => {
+    if (!moreCursor) return;
+    const page = unwrap(
+      await api.GET("/v1/jokes/{id}/comments", { params: { path: { id: joke.id }, query: { limit: 20, cursor: moreCursor } } }),
+    );
+    setComments((prev) => [...(prev ?? []), ...page.data.filter((c) => !prev?.some((p) => p.id === c.id))]);
+    setMoreCursor(page.nextCursor);
+  };
+
+  const react = async (kind: NonNullable<Joke["myReaction"]>) => {
+    try {
+      setStats(await toggleReaction(joke.id, stats.myReaction, kind));
+    } catch (e) {
+      showToast(errorMessage(e));
+    }
+  };
+
+  const post = async (e: FormEvent) => {
     e.preventDefault();
     const body = draft.trim();
-    if (!body) return;
-    addComment(joke.id, body);
-    setDraft("");
+    if (!body || posting) return;
+    setPosting(true);
+    try {
+      const c = unwrap(await api.POST("/v1/jokes/{id}/comments", { params: { path: { id: joke.id } }, body: { body } }));
+      setComments((prev) => [c, ...(prev ?? [])]);
+      setStats((s) => ({ ...s, comments: s.comments + 1 }));
+      setDraft("");
+    } catch (err) {
+      showToast(errorMessage(err));
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  const remove = async (c: Comment) => {
+    const { response } = await api.DELETE("/v1/comments/{id}", { params: { path: { id: c.id } } });
+    if (!response.ok) return showToast("Couldn't delete that comment.");
+    setComments((prev) => prev?.filter((x) => x.id !== c.id) ?? null);
+    setStats((s) => ({ ...s, comments: Math.max(0, s.comments - 1) }));
+  };
+
+  const report = async (target: { jokeId: string } | { commentId: string }, what: string) => {
+    const { response } = await api.POST("/v1/reports", {
+      body: { ...target, reason: "jokeId" in target ? "copied" : "offensive" },
+    });
+    showToast(response.ok ? `Thanks. The curators will look at this ${what}.` : "Couldn't send the report. Try again.");
+  };
+
+  const share = async () => {
+    const result = await shareJoke(joke);
+    if (result === "copied") showToast("Copied. Go spread the groans.");
   };
 
   const toggleSubscribe = async () => {
@@ -97,10 +163,21 @@ function Detail({ joke }: { joke: Joke }) {
       <div className="detail-grid">
         <div className="detail-joke">
           <StoryCard face={faceOf(joke)} revealed variant="inline" animate={false} />
-          <Link to={`/view/${joke.id}`} className="btn btn-quiet detail-replay">
-            <Icon name="replay" size={20} />
-            Replay as a status
-          </Link>
+          <div className="detail-joke-actions">
+            <Link to={`/view/${joke.id}`} className="btn btn-quiet detail-replay">
+              <Icon name="replay" size={20} />
+              Replay as a status
+            </Link>
+            <button type="button" className="btn btn-quiet" onClick={() => void share()}>
+              <Icon name="send" size={20} />
+              Share
+            </button>
+          </div>
+          {joke.isMine ? null : (
+            <button type="button" className="link-btn detail-report" onClick={() => void report({ jokeId: joke.id }, "joke")}>
+              Report this joke as copied
+            </button>
+          )}
         </div>
 
         <div className="detail-side">
@@ -181,22 +258,22 @@ function Detail({ joke }: { joke: Joke }) {
             <div className="detail-section-head">
               <h2 id="react-title">How did it land?</h2>
               <p className="detail-counts">
-                <Icon name="eye" size={18} /> {compact(joke.stats.views)} views,{" "}
+                <Icon name="eye" size={18} /> {compact(stats.views)} views,{" "}
                 {compact(totalReactions(counts))} reactions
               </p>
             </div>
-            <ReactionBar
-              selected={myReaction(joke.id)}
-              counts={counts}
-              onReact={(k) => react(joke.id, k)}
-            />
+            {joke.isMine ? (
+              <p className="detail-mine-note">It's your joke, so you can't react, but you can watch the groans come in.</p>
+            ) : (
+              <ReactionBar selected={stats.myReaction ?? undefined} counts={counts} onReact={(k) => void react(k)} />
+            )}
             <GroanMeter counts={counts} />
           </section>
         </div>
 
         <section className="detail-section detail-comments" aria-labelledby="comments-title">
-          <h2 id="comments-title">Comments ({comments.length})</h2>
-          <form className="comment-form" onSubmit={post}>
+          <h2 id="comments-title">Comments ({stats.comments})</h2>
+          <form className="comment-form" onSubmit={(e) => void post(e)}>
             <Avatar name={account?.name ?? "You"} tone={account?.tone ?? "navy"} size={36} />
             <label className="visually-hidden" htmlFor="comment">
               Add a comment
@@ -204,32 +281,50 @@ function Detail({ joke }: { joke: Joke }) {
             <input
               id="comment"
               value={draft}
+              maxLength={280}
               onChange={(e) => setDraft(e.target.value)}
               placeholder="Add a groan of your own"
               autoComplete="off"
             />
-            <button type="submit" className="btn btn-primary btn-small" disabled={!draft.trim()}>
+            <button type="submit" className="btn btn-primary btn-small" disabled={!draft.trim() || posting}>
               Post
             </button>
           </form>
-          {comments.length === 0 ? (
+          {comments !== null && comments.length === 0 ? (
             <p className="comments-empty">No comments yet. Be the first to groan in writing.</p>
           ) : (
-            <ul className="comments">
-              {comments.map((c) => (
+            <ul className="comments" aria-busy={comments === null}>
+              {(comments ?? []).map((c) => (
                 <li key={c.id} className="comment">
-                  <Avatar name={c.author} tone={c.tone} size={36} />
-                  <div>
+                  <Avatar name={c.author.name} tone={c.author.tone} size={36} />
+                  <div className="comment-main">
                     <p className="comment-head">
-                      <strong>{c.author}</strong>
-                      <span>{c.postedAt === "now" ? "just now" : `${c.postedAt} ago`}</span>
+                      <strong>{c.author.name}</strong>
+                      <span>{timeAgo(c.createdAt)}</span>
                     </p>
                     <p>{c.body}</p>
+                    <div className="comment-actions">
+                      {c.canDelete ? (
+                        <button type="button" className="link-btn" onClick={() => void remove(c)}>
+                          Delete
+                        </button>
+                      ) : null}
+                      {c.isMine ? null : (
+                        <button type="button" className="link-btn" onClick={() => void report({ commentId: c.id }, "comment")}>
+                          Report
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </li>
               ))}
             </ul>
           )}
+          {moreCursor ? (
+            <button type="button" className="btn btn-quiet btn-small" onClick={() => void loadMore()}>
+              Older comments
+            </button>
+          ) : null}
         </section>
       </div>
     </div>

@@ -7,6 +7,7 @@ import { AppConfig, AppConfigModule } from "./config/config.module";
 import { CreatorsModule } from "./creators/creators.module";
 import { DbModule } from "./db/db.module";
 import { DeliveriesModule } from "./deliveries/deliveries.module";
+import { EngagementModule } from "./engagement/engagement.module";
 import { CurationModule } from "./curation/curation.module";
 import { JokesModule } from "./jokes/jokes.module";
 import { StorageModule } from "./storage/storage.module";
@@ -53,6 +54,7 @@ export const queueRoot = BullModule.forRootAsync({
     JokesModule,
     CurationModule,
     DeliveriesModule,
+    EngagementModule,
     AuthModule,
   ],
   controllers: [HealthController],

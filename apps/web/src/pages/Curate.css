@@ -16,7 +16,7 @@
   font-size: var(--step-3);
 }
 
-.curate-head p,
+.curate-count,
 .cal-head p,
 .qcard-muted {
   color: var(--ink-soft);
@@ -232,4 +232,51 @@
 .qcard-thumb .story-caption {
   font-size: 8px;
   padding: 6px;
+}
+
+.curate-tabs {
+  justify-self: start;
+  margin-top: 6px;
+}
+
+.curate-tabs .segmented-opt {
+  font-family: inherit;
+  font-weight: 700;
+  font-size: var(--step--1);
+  border: 0;
+  background: transparent;
+  padding: 0 18px;
+  cursor: pointer;
+}
+
+.curate-tabs .segmented-opt.is-on {
+  background: var(--ink);
+  color: #fff;
+}
+
+.curate-tabs .segmented-opt:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+.report-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.report-reason {
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--fridge);
+  color: var(--ink-soft);
+}
+
+.report-notes {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink-soft);
+  font-size: var(--step--1);
 }
