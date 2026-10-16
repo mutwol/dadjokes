@@ -93,7 +93,7 @@ export const UpdatePreferencesRequest = named(
     .partial(),
 );
 
-const KenyanMobile = z
+export const KenyanMobile = z
   .string()
   .transform((v) => v.replace(/\D/g, ""))
   .transform((d) => (d.startsWith("0") ? `254${d.slice(1)}` : d.length === 9 ? `254${d}` : d))

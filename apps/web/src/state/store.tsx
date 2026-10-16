@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { api, errorMessage, refreshAccessToken, setAccessToken, unwrap } from "../api/client.ts";
+import { syncPush } from "../api/push.ts";
 import type { Me, Session } from "../api/client.ts";
 import type { NotificationState, Role } from "../data/types.ts";
 import { Ctx } from "./useStore.ts";
@@ -23,6 +24,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [account, setAccountState] = useState<Me | null>(null);
   const [notifications, setNotificationsState] = useState<NotificationState>(loadNotifications);
   const [toast, setToast] = useState<string | null>(null);
+  const [unread, setUnread] = useState(0);
   const toastTimer = useRef<number | undefined>(undefined);
 
   // Restore the session from the refresh cookie on page load.
@@ -48,6 +50,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, []);
+
+  const refreshUnread = useCallback(() => {
+    void api.GET("/v1/me/activity", { params: { query: { limit: 1 } } }).then(({ data }) => {
+      if (data) setUnread(data.unread);
+    });
+  }, []);
+
+  // Once signed in: keep the unread count fresh, and this browser's push subscription in sync.
+  useEffect(() => {
+    if (status !== "signed-in") return;
+    refreshUnread();
+    const t = window.setInterval(refreshUnread, 60_000);
+    if (loadNotifications() === "on") void syncPush().catch(() => undefined);
+    return () => window.clearInterval(t);
+  }, [status, refreshUnread]);
 
   const showToast = useCallback((msg: string) => {
     window.clearTimeout(toastTimer.current);
@@ -130,6 +147,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
       deliveryHour: account?.preferences.deliveryHour ?? DEFAULT_DELIVERY_HOUR,
       setDeliveryHour,
+      unread,
+      refreshUnread,
+      clearUnread: () => setUnread(0),
       toast,
       showToast,
     }),
@@ -143,6 +163,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       notifications,
       setNotifications,
       setDeliveryHour,
+      unread,
+      refreshUnread,
       toast,
       showToast,
     ],

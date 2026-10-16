@@ -404,3 +404,7 @@
     animation: none;
   }
 }
+
+.today-bell {
+  position: relative;
+}

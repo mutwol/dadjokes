@@ -9,6 +9,7 @@ import type { Db } from "../db/db.module";
 import { comments, jokeEvents, jokes, jokeStatsDaily, reactions, reports, userRoles, users } from "../db/schema";
 import { DeliveriesService, zeroReactions } from "../deliveries/deliveries.service";
 import type { ReactionKind } from "../deliveries/schemas";
+import { NotificationsService } from "../notifications/notifications.service";
 import { LiveService } from "./live.service";
 import type {
   CommentOut,
@@ -27,6 +28,7 @@ export class EngagementService implements OnModuleInit {
     @InjectDb() private readonly db: Db,
     private readonly deliveries: DeliveriesService,
     private readonly live: LiveService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /** Reactions and comments become part of every joke's stats. */
@@ -117,13 +119,22 @@ export class EngagementService implements OnModuleInit {
   }
 
   async addComment(viewerId: string, jokeId: string, body: string): Promise<CommentOut> {
-    await this.deliveries.access(viewerId, jokeId);
+    const { joke } = await this.deliveries.access(viewerId, jokeId);
     const [c] = await this.db.insert(comments).values({ jokeId, userId: viewerId, body }).returning();
     const [me] = await this.db
       .select({ name: users.name, handle: users.handle, tone: users.tone })
       .from(users)
       .where(eq(users.id, viewerId));
     this.live.changed(jokeId);
+    if (joke.creatorId !== viewerId) {
+      await this.notifications.notify({
+        userId: joke.creatorId,
+        type: "comment",
+        actorId: viewerId,
+        jokeId,
+        data: { excerpt: body.length > 100 ? `${body.slice(0, 99)}…` : body },
+      });
+    }
     return toComment({ c, ...me }, viewerId, false);
   }
 
@@ -306,13 +317,20 @@ export class EngagementService implements OnModuleInit {
           this.live.changed(c.jokeId);
         }
       } else {
-        const [j] = await tx.select({ id: jokes.id }).from(jokes).where(eq(jokes.id, req.jokeId!));
+        const [j] = await tx.select().from(jokes).where(eq(jokes.id, req.jokeId!));
         if (!j) throw notFound("Joke");
         if (req.action === "remove") {
-          await tx
+          const taken = await tx
             .update(jokes)
             .set({ removedAt: now, removedBy: curatorId })
-            .where(and(eq(jokes.id, req.jokeId!), isNull(jokes.removedAt)));
+            .where(and(eq(jokes.id, req.jokeId!), isNull(jokes.removedAt)))
+            .returning({ id: jokes.id });
+          if (taken.length) {
+            await this.notifications.notify(
+              { userId: j.creatorId, type: "joke_removed", jokeId: j.id, data: { setup: j.setup ?? j.caption } },
+              tx,
+            );
+          }
           this.logger.log(`Joke ${req.jokeId} taken down by ${curatorId}`);
         }
       }

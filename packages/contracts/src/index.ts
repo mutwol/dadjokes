@@ -28,6 +28,10 @@ export type JokeStats = Schemas["JokeStats"];
 export type Comment = Schemas["Comment"];
 export type ReportedItem = Schemas["ReportedItem"];
 export type StudioDaily = Schemas["StudioDaily"];
+export type Activity = Schemas["Activity"];
+export type Tip = Schemas["Tip"];
+export type Balance = Schemas["Balance"];
+export type PayoutTransfer = Schemas["PayoutTransfer"];
 
 /** Error thrown by `unwrap` for any non-2xx response. */
 export class ApiError extends Error {

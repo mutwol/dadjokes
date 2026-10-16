@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { api, errorMessage, unwrap } from "../api/client.ts";
-import type { Comment, Joke } from "../api/client.ts";
+import { ApiError, api, errorMessage, unwrap } from "../api/client.ts";
+import type { Comment, Joke, Tip } from "../api/client.ts";
 import { shareJoke, toggleReaction } from "../api/engagement.ts";
 import { useLiveStats } from "../api/useLiveStats.ts";
 import { Avatar } from "../components/Avatar.tsx";
@@ -16,6 +16,17 @@ import { useStore } from "../state/useStore.ts";
 import "./JokeDetail.css";
 
 const TIP_AMOUNTS = [20, 50, 100, 250];
+/** The platform's share, as configured on the API (TIP_FEE_PERCENT). */
+const TIP_FEE = 10;
+const PHONE_KEY = "daddyjokes.tipPhone";
+
+function savedPhone(): string {
+  try {
+    return window.localStorage.getItem(PHONE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
 
 export function JokeDetail() {
   const { id = "" } = useParams();
@@ -58,6 +69,38 @@ function Detail({ joke }: { joke: Joke }) {
   const [tipOpen, setTipOpen] = useState(false);
   const [tip, setTip] = useState(50);
   const [subscribed, setSubscribed] = useState(joke.creator.isSubscribed);
+  const [tipPhone, setTipPhone] = useState(savedPhone);
+  const [tipState, setTipState] = useState<Tip | null>(null);
+
+  // Follow a pending tip until M-Pesa says how it went (the PIN prompt takes a few seconds).
+  useEffect(() => {
+    if (tipState?.status !== "pending") return;
+    const id = tipState.id;
+    const t = window.setTimeout(async () => {
+      const { data } = await api.GET("/v1/tips/{id}", { params: { path: { id } } });
+      if (!data) return;
+      setTipState(data);
+      if (data.status === "paid") showToast(`Tip sent to ${joke.creator.name.split(" ")[0]}. Thank you!`);
+    }, 2000);
+    return () => window.clearTimeout(t);
+  }, [tipState, showToast, joke.creator.name]);
+
+  const sendTip = async (e: FormEvent) => {
+    e.preventDefault();
+    try {
+      window.localStorage.setItem(PHONE_KEY, tipPhone);
+    } catch {
+      // Not remembered on this device; that's fine.
+    }
+    try {
+      setTipState(
+        unwrap(await api.POST("/v1/jokes/{id}/tips", { params: { path: { id: joke.id } }, body: { amountKes: tip, phone: tipPhone } })),
+      );
+    } catch (err) {
+      const fields = err instanceof ApiError ? Object.values(err.fieldErrors()) : [];
+      showToast(fields[0] ?? errorMessage(err));
+    }
+  };
 
   const creator = joke.creator;
   const counts = stats.reactions;
@@ -211,6 +254,7 @@ function Detail({ joke }: { joke: Joke }) {
                 )}
               </button>
               )}
+              {joke.isMine ? null : (
               <button
                 type="button"
                 className="btn btn-quiet"
@@ -221,6 +265,7 @@ function Detail({ joke }: { joke: Joke }) {
                 <Icon name="coin" size={20} />
                 Tip {first}
               </button>
+              )}
             </div>
 
             {tipOpen ? (
@@ -240,16 +285,34 @@ function Detail({ joke }: { joke: Joke }) {
                     </button>
                   ))}
                 </div>
-                <button
-                  type="button"
-                  className="btn btn-primary btn-block"
-                  onClick={() => {
-                    setTipOpen(false);
-                    showToast(`Tipping isn't connected yet. KES ${tip} not sent.`);
-                  }}
-                >
-                  Tip KES {tip} with M-Pesa
-                </button>
+                <form className="tip-form" onSubmit={(e) => void sendTip(e)}>
+                  <label className="tip-phone">
+                    <span>M-Pesa number</span>
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      placeholder="0712 345 678"
+                      value={tipPhone}
+                      onChange={(e) => setTipPhone(e.target.value)}
+                      disabled={tipState !== null && tipState.status === "pending"}
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    className="btn btn-primary btn-block"
+                    disabled={!tipPhone.trim() || (tipState !== null && tipState.status === "pending")}
+                  >
+                    {tipState?.status === "pending" ? "Waiting for your PIN…" : `Tip KES ${tip} with M-Pesa`}
+                  </button>
+                </form>
+                {tipState ? (
+                  <p className={`tip-status tip-${tipState.status}`} role="status">
+                    {tipState.message}
+                  </p>
+                ) : (
+                  <p className="field-help">You'll get a prompt on your phone. {first} gets {100 - TIP_FEE}% of it.</p>
+                )}
               </div>
             ) : null}
           </section>

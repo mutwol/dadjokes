@@ -227,3 +227,39 @@
   color: var(--ink-soft);
   font-size: var(--step--1);
 }
+
+.tip-form {
+  display: grid;
+  gap: 10px;
+}
+
+.tip-phone {
+  display: grid;
+  gap: 4px;
+  font-size: var(--step--1);
+  font-weight: 700;
+}
+
+.tip-phone input {
+  font: inherit;
+  font-weight: 600;
+  padding: 10px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  min-height: 44px;
+}
+
+.tip-status {
+  font-weight: 700;
+  font-size: var(--step--1);
+}
+
+.tip-paid {
+  color: #1d6b3b;
+}
+
+.tip-failed,
+.tip-cancelled,
+.tip-expired {
+  color: var(--tag-red-deep);
+}

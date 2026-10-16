@@ -1,6 +1,7 @@
 import { createBrowserRouter, RouterProvider } from "react-router";
 import { AppShell } from "./components/AppShell.tsx";
 import { RequireCurator, RequireProfile, RequireWriter } from "./components/RoleGate.tsx";
+import { Activity } from "./pages/Activity.tsx";
 import { Create } from "./pages/Create.tsx";
 import { Curate } from "./pages/Curate.tsx";
 import { JokeDetail } from "./pages/JokeDetail.tsx";
@@ -92,15 +93,7 @@ const router = createBrowserRouter([
           />
         ),
       },
-      {
-        path: "activity",
-        element: (
-          <Placeholder
-            title="Activity"
-            body="Replies, reactions to your jokes and new subscribers will show here. Planned for a later step."
-          />
-        ),
-      },
+      { path: "activity", element: <Activity /> },
       { path: "me", element: <Profile /> },
       {
         path: "*",

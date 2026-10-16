@@ -21,6 +21,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Activity feed, newest first, with the unread count */
+        get: operations["listActivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/activity/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark everything in my feed as read */
+        post: operations["markActivityRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/push/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether push notifications are available, and the VAPID key */
+        get: operations["getPushConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/push-subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Send push notifications to this browser */
+        put: operations["addPushSubscription"];
+        post?: never;
+        /** Stop push notifications to this browser */
+        delete: operations["removePushSubscription"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me": {
         parameters: {
             query?: never;
@@ -568,6 +637,75 @@ export interface paths {
         put?: never;
         /** Dismiss reports, or take the joke or comment down */
         post: operations["resolveReports"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/jokes/{id}/tips": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tip the writer with M-Pesa. The phone gets a PIN prompt; poll the tip for the result. */
+        post: operations["tipJoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tips/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How my tip is going */
+        get: operations["getTip"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/balance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My tips balance */
+        get: operations["getBalance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/payouts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My withdrawals, newest first */
+        get: operations["listPayouts"];
+        put?: never;
+        /** Withdraw tips to my M-Pesa */
+        post: operations["requestPayout"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1175,6 +1313,92 @@ export interface components {
             reason: "possible_copy" | "not_a_dad_joke" | "offensive" | "unclear" | "other";
             note?: string;
         };
+        Activity: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            type: "joke_scheduled" | "joke_declined" | "joke_delivered" | "joke_removed" | "new_subscriber" | "comment" | "tip_received" | "payout_paid" | "payout_failed";
+            title: string;
+            body: string | null;
+            /** @description Where tapping it should go in the app. */
+            url: string;
+            actor: {
+                name: string;
+                handle: string;
+                /** @enum {string} */
+                tone: "red" | "navy" | "yellow" | "green" | "denim";
+            } | null;
+            /** Format: date-time */
+            createdAt: string;
+            read: boolean;
+        };
+        ActivityPage: {
+            data: components["schemas"]["Activity"][];
+            nextCursor: string | null;
+            unread: number;
+        };
+        PushConfig: {
+            enabled: boolean;
+            publicKey: string | null;
+        };
+        PushSubscriptionRequest: {
+            /** Format: uri */
+            endpoint: string;
+            keys: {
+                p256dh: string;
+                auth: string;
+            };
+        };
+        RemovePushSubscriptionRequest: {
+            /** Format: uri */
+            endpoint: string;
+        };
+        CreateTipRequest: {
+            amountKes: number;
+            /** @description The M-Pesa number to charge. It gets a prompt to enter the PIN. */
+            phone: string;
+        };
+        Tip: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            jokeId: string;
+            amountKes: number;
+            /** @enum {string} */
+            status: "pending" | "paid" | "failed" | "cancelled" | "expired";
+            /** @description What to tell the tipper about the current status. */
+            message: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        Balance: {
+            /** @description Can be withdrawn now. */
+            availableKes: number;
+            /** @description Everything tipped to you, after the platform fee. */
+            lifetimeTipsKes: number;
+            paidOutKes: number;
+            pendingPayoutKes: number;
+            minimumPayoutKes: number;
+            payoutPhoneLast3: string | null;
+        };
+        CreatePayoutRequest: {
+            amountKes: number;
+        };
+        PayoutTransfer: {
+            /** Format: uuid */
+            id: string;
+            amountKes: number;
+            phoneLast3: string;
+            /** @enum {string} */
+            status: "requested" | "processing" | "paid" | "failed";
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            completedAt: string | null;
+        };
+        PayoutList: {
+            data: components["schemas"]["PayoutTransfer"][];
+        };
         CreateUploadRequest: {
             /** @enum {string} */
             contentType: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
@@ -1232,6 +1456,111 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Problem"];
                 };
+            };
+        };
+    };
+    listActivity: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityPage"];
+                };
+            };
+        };
+    };
+    markActivityRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getPushConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushConfig"];
+                };
+            };
+        };
+    };
+    addPushSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushSubscriptionRequest"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    removePushSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RemovePushSubscriptionRequest"];
+            };
+        };
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -2265,6 +2594,145 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    tipJoke: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTipRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tip"];
+                };
+            };
+            /** @description Bad amount or number, or it's your own joke */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description M-Pesa is unavailable */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getTip: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tip"];
+                };
+            };
+        };
+    };
+    getBalance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Balance"];
+                };
+            };
+        };
+    };
+    listPayouts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayoutList"];
+                };
+            };
+        };
+    };
+    requestPayout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePayoutRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayoutTransfer"];
+                };
+            };
+            /** @description Too little, more than the balance, or no M-Pesa number */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
             };
         };
     };

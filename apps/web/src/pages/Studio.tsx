@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import { Link } from "react-router";
 import { api, errorMessage, unwrap } from "../api/client.ts";
-import type { StudioDaily, StudioSummary, Submission } from "../api/client.ts";
+import type { Balance, PayoutTransfer, StudioDaily, StudioSummary, Submission } from "../api/client.ts";
 import { DailyChart } from "../components/DailyChart.tsx";
 import { Icon } from "../components/Icon.tsx";
 import { StoryCard } from "../components/StoryCard.tsx";
 import { faceOf } from "../data/face.ts";
 import { compact } from "../data/reactions.ts";
 
-import { longDate } from "../data/dates.ts";
+import { longDate, shortDate } from "../data/dates.ts";
 import { useStore } from "../state/useStore.ts";
 import "./Studio.css";
 
@@ -37,6 +38,8 @@ export function Studio() {
   const [attempt, setAttempt] = useState(0);
   const [summary, setSummary] = useState<StudioSummary | null>(null);
   const [daily, setDaily] = useState<StudioDaily["data"] | null>(null);
+  const [balance, setBalance] = useState<Balance | null>(null);
+  const [transfers, setTransfers] = useState<PayoutTransfer[]>([]);
 
   const fetchPage = useCallback(
     (cursor?: string) => api.GET("/v1/me/jokes", { params: { query: { limit: 20, cursor } } }).then(unwrap),
@@ -45,6 +48,14 @@ export function Studio() {
 
   useEffect(() => {
     let cancelled = false;
+    void Promise.all([api.GET("/v1/me/balance").then(unwrap), api.GET("/v1/me/payouts").then(unwrap)]).then(
+      ([b, p]) => {
+        if (cancelled) return;
+        setBalance(b);
+        setTransfers(p.data);
+      },
+      () => undefined,
+    );
     void api
       .GET("/v1/me/studio/daily")
       .then(unwrap)
@@ -125,9 +136,20 @@ export function Studio() {
         </div>
         <div>
           <dt>Tips received</dt>
-          <dd>{summary ? `KES ${compact(summary.tipsKes)}` : "–"}</dd>
+          <dd>{balance ? `KES ${compact(balance.lifetimeTipsKes)}` : "–"}</dd>
         </div>
       </dl>
+
+      {balance ? (
+        <TipsPanel
+          balance={balance}
+          transfers={transfers}
+          onWithdrawn={(p, b) => {
+            setTransfers((prev) => [p, ...prev]);
+            setBalance(b);
+          }}
+        />
+      ) : null}
 
       {daily && daily.some((d) => d.opens) ? (
         <DailyChart title="Opens, last 14 days" unit="opens" days={daily.map((d) => ({ date: d.date, value: d.opens }))} />
@@ -189,6 +211,98 @@ export function Studio() {
         ) : null}
       </section>
     </div>
+  );
+}
+
+const TRANSFER_STATUS: Record<PayoutTransfer["status"], string> = {
+  requested: "Sending",
+  processing: "Sending",
+  paid: "Sent",
+  failed: "Failed, returned to balance",
+};
+
+function TipsPanel({
+  balance,
+  transfers,
+  onWithdrawn,
+}: {
+  balance: Balance;
+  transfers: PayoutTransfer[];
+  onWithdrawn: (p: PayoutTransfer, b: Balance) => void;
+}) {
+  const { showToast } = useStore();
+  const [amount, setAmount] = useState("");
+  const [busy, setBusy] = useState(false);
+  const available = Math.floor(balance.availableKes);
+  const canWithdraw = balance.payoutPhoneLast3 !== null && available >= balance.minimumPayoutKes;
+
+  const withdraw = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const p = unwrap(await api.POST("/v1/me/payouts", { body: { amountKes: Number(amount) } }));
+      const b = unwrap(await api.GET("/v1/me/balance"));
+      onWithdrawn(p, b);
+      setAmount("");
+      showToast(`KES ${p.amountKes} is on its way to your M-Pesa.`);
+    } catch (err) {
+      showToast(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="tips-panel" aria-labelledby="tips-title">
+      <div className="tips-head">
+        <div>
+          <h2 id="tips-title">Your tips</h2>
+          <p className="tips-balance">
+            <strong>KES {balance.availableKes.toLocaleString("en-KE")}</strong> ready to withdraw
+          </p>
+        </div>
+        {balance.pendingPayoutKes ? <p className="sub-meta">KES {balance.pendingPayoutKes} on its way</p> : null}
+      </div>
+      {balance.payoutPhoneLast3 === null ? (
+        <p className="sub-meta">
+          Add your M-Pesa number in your <Link to="/me">profile</Link> to withdraw tips.
+        </p>
+      ) : canWithdraw ? (
+        <form className="tips-form" onSubmit={(e) => void withdraw(e)}>
+          <label>
+            <span className="visually-hidden">Amount in KES</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={balance.minimumPayoutKes}
+              max={available}
+              step={1}
+              placeholder={`${balance.minimumPayoutKes}–${available}`}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+            />
+          </label>
+          <button type="submit" className="btn btn-primary btn-small" disabled={busy || !amount}>
+            Withdraw to M-Pesa ending {balance.payoutPhoneLast3}
+          </button>
+        </form>
+      ) : (
+        <p className="sub-meta">You can withdraw once you have KES {balance.minimumPayoutKes}.</p>
+      )}
+      {transfers.length ? (
+        <ul className="tips-transfers">
+          {transfers.slice(0, 5).map((t) => (
+            <li key={t.id}>
+              <span>KES {t.amountKes}</span>
+              <span className="sub-meta">
+                {TRANSFER_STATUS[t.status]} · {shortDate(t.createdAt.slice(0, 10))}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
   );
 }
 

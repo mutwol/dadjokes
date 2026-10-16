@@ -8,6 +8,7 @@ import type { Db, Tx } from "../db/db.module";
 import { jokes, jokeText, users } from "../db/schema";
 import type { Joke } from "../db/schema";
 import { JokesService } from "../jokes/jokes.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import type { Submission } from "../jokes/schemas";
 import type { CalendarQuery, CuratedJoke, DeclineRequest, QueueQuery, ScheduleRequest } from "./schemas";
 
@@ -26,6 +27,7 @@ export class CurationService {
   constructor(
     @InjectDb() private readonly db: Db,
     private readonly jokes: JokesService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /** Jokes waiting for review, oldest first, each with possible copies. */
@@ -166,6 +168,16 @@ export class CurationService {
           declineNote: null,
         })
         .where(eq(jokes.id, id));
+      await this.notifications.notify(
+        {
+          userId: j.creatorId,
+          type: "joke_scheduled",
+          jokeId: id,
+          data: { setup: j.setup ?? j.caption, deliverOn: req.deliverOn },
+          dedupeKey: `scheduled:${id}:${req.deliverOn}`,
+        },
+        tx,
+      );
       return this.get(id, tx);
     });
   }
@@ -188,6 +200,10 @@ export class CurationService {
           declineNote: req.note || null,
         })
         .where(eq(jokes.id, id));
+      await this.notifications.notify(
+        { userId: j.creatorId, type: "joke_declined", jokeId: id, data: { setup: j.setup ?? j.caption, reason: req.reason } },
+        tx,
+      );
       return this.get(id, tx);
     });
   }

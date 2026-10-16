@@ -10,6 +10,8 @@ import { DeliveriesModule } from "./deliveries/deliveries.module";
 import { EngagementModule } from "./engagement/engagement.module";
 import { CurationModule } from "./curation/curation.module";
 import { JokesModule } from "./jokes/jokes.module";
+import { NotificationsModule } from "./notifications/notifications.module";
+import { PaymentsModule } from "./payments/payments.module";
 import { StorageModule } from "./storage/storage.module";
 import { HealthController } from "./health/health.controller";
 import { MailModule } from "./mail/mail.module";
@@ -49,12 +51,14 @@ export const queueRoot = BullModule.forRootAsync({
     }),
     MailModule,
     StorageModule,
+    NotificationsModule,
     UsersModule,
     CreatorsModule,
     JokesModule,
     CurationModule,
     DeliveriesModule,
     EngagementModule,
+    PaymentsModule,
     AuthModule,
   ],
   controllers: [HealthController],

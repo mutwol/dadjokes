@@ -22,6 +22,10 @@ export interface Store {
 
   deliveryHour: number;
   setDeliveryHour: (h: number) => void;
+  /** Unread Activity items, refreshed every minute and on navigation. */
+  unread: number;
+  refreshUnread: () => void;
+  clearUnread: () => void;
   toast: string | null;
   showToast: (msg: string) => void;
 }

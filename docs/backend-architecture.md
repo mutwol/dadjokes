@@ -77,6 +77,13 @@ packages/contracts     openapi.json + generated types + typed client
 | POST | `/v1/events` | Batched replays and shares |
 | GET | `/v1/me/studio/daily` | Opens, reactions, comments per day (14 days) |
 | GET · POST | `/v1/curation/reports` · `/resolve` | Open reports grouped by target · dismiss or take down |
+| GET · POST | `/v1/me/activity` · `/read` | Activity feed with unread count · mark read |
+| GET | `/v1/push/config` | Whether push is on, and the VAPID public key |
+| PUT · DELETE | `/v1/me/push-subscriptions` | Push to this browser · stop |
+| POST | `/v1/jokes/{id}/tips` | Tip with an M-Pesa STK push |
+| GET | `/v1/tips/{id}` | How my tip is going |
+| GET | `/v1/me/balance` | Tips available to withdraw (writers) |
+| GET · POST | `/v1/me/payouts` | Withdrawals · withdraw to M-Pesa (B2C) |
 | GET | `/health` | Postgres and Redis status |
 
 Interactive docs run at `http://localhost:3000/docs` in development.
@@ -133,6 +140,21 @@ a day already taken by a real (non-seed) joke is left alone and the test joke go
 - The worker rebuilds `joke_stats_daily` every 15 minutes (and at start) for the last two days,
   recomputing rather than incrementing, so reruns are harmless. Studio's chart reads it.
 
-**Phase 4: notifications and money**
-- Web push subscriptions and the activity feed.
-- Tips through M-Pesa (STK push, callbacks confirmed by status query), payouts, a double-entry `ledger_entries` table that later also carries revenue share.
+**Phase 4: notifications and money (done)**
+- `notifications` feed the Activity screen: picks, declines, a joke going out or being taken down,
+  new subscribers (once each), comments, tips and payouts. Each also goes out as Web Push to the
+  person's browsers (`push_subscriptions`); readers also get "today's joke is here". The worker
+  sends push and drops subscriptions the push service says are gone. Push is off until the
+  VAPID keys are set.
+- Tips: `POST /v1/jokes/:id/tips` sends an STK push to the tipper's phone. Safaricom's callback
+  (on a secret path) only records the receipt; a status query decides the result, and a
+  minute-by-minute sweep settles any tip whose callback never came. Settling happens once.
+- Ledger: `ledger_entries` is double-entry in cents. Every transaction balances, enforced by a
+  deferred trigger at commit; entries can't be changed or deleted. A paid tip of 100 posts
+  +10000 to `mpesa:clearing`, −9000 to `creator:<id>` and −1000 to `platform:fees`
+  (`TIP_FEE_PERCENT`). A writer's balance is what `creator:<id>` is owed.
+- Payouts: the balance is debited when the writer asks (under a per-writer lock, so it can't be
+  overdrawn), then the worker sends a B2C payment. A failed payout posts a reversal, so the money
+  is back in the balance.
+- `MPESA_MODE=fake` (default) needs no Safaricom account; `sandbox` and `production` use Daraja.
+  Revenue share for writers can later post from `platform:fees` the same way.

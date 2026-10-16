@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   check,
+  jsonb,
   date,
   index,
   integer,
@@ -391,6 +393,151 @@ export const jokeStatsDaily = pgTable(
   (t) => [primaryKey({ columns: [t.jokeId, t.day] })],
 );
 
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "joke_scheduled",
+  "joke_declined",
+  "joke_delivered",
+  "joke_removed",
+  "new_subscriber",
+  "comment",
+  "tip_received",
+  "payout_paid",
+  "payout_failed",
+]);
+
+/** The Activity feed: things that happened to you, newest first. */
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    type: notificationTypeEnum("type").notNull(),
+    actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
+    jokeId: uuid("joke_id").references(() => jokes.id, { onDelete: "cascade" }),
+    /** Type-specific details shown in the feed, e.g. a comment excerpt or a tip amount. */
+    data: jsonb("data").$type<Record<string, unknown>>().notNull().default({}),
+    /** Makes a notification happen once, e.g. one "new subscriber" per subscriber. */
+    dedupeKey: text("dedupe_key"),
+    createdAt: createdAt(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("notifications_user_idx").on(t.userId, t.createdAt),
+    uniqueIndex("notifications_dedupe_key").on(t.userId, t.dedupeKey).where(sql`${t.dedupeKey} is not null`),
+  ],
+);
+
+/** A browser that agreed to push notifications (Web Push). */
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    userAgent: text("user_agent"),
+    createdAt: createdAt(),
+    lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("push_subscriptions_endpoint_key").on(t.endpoint), index("push_subscriptions_user_idx").on(t.userId)],
+);
+
+export const tipStatusEnum = pgEnum("tip_status", ["pending", "paid", "failed", "cancelled", "expired"]);
+
+/** A reader tipping a writer for a joke, paid with an M-Pesa STK push. */
+export const tips = pgTable(
+  "tips",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    jokeId: uuid("joke_id")
+      .notNull()
+      .references(() => jokes.id, { onDelete: "restrict" }),
+    tipperId: uuid("tipper_id").references(() => users.id, { onDelete: "set null" }),
+    creatorId: uuid("creator_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    amountKes: integer("amount_kes").notNull(),
+    /** E.164 without the plus. */
+    phone: text("phone").notNull(),
+    status: tipStatusEnum("status").notNull().default("pending"),
+    checkoutRequestId: text("checkout_request_id"),
+    merchantRequestId: text("merchant_request_id"),
+    receipt: text("receipt"),
+    resultCode: text("result_code"),
+    resultDesc: text("result_desc"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("tips_checkout_key").on(t.checkoutRequestId),
+    uniqueIndex("tips_receipt_key").on(t.receipt),
+    index("tips_creator_idx").on(t.creatorId, t.createdAt),
+    index("tips_pending_idx").on(t.createdAt).where(sql`${t.status} = 'pending'`),
+    check("tips_amount_range", sql`${t.amountKes} between 10 and 10000`),
+  ],
+);
+
+export const payoutStatusEnum = pgEnum("payout_status", ["requested", "processing", "paid", "failed"]);
+
+/** A writer withdrawing their tips to M-Pesa (B2C). */
+export const payouts = pgTable(
+  "payouts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    amountKes: integer("amount_kes").notNull(),
+    phone: text("phone").notNull(),
+    status: payoutStatusEnum("status").notNull().default("requested"),
+    conversationId: text("conversation_id"),
+    originatorConversationId: text("originator_conversation_id"),
+    receipt: text("receipt"),
+    resultCode: text("result_code"),
+    resultDesc: text("result_desc"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("payouts_originator_key").on(t.originatorConversationId),
+    index("payouts_user_idx").on(t.userId, t.createdAt),
+    check("payouts_amount_min", sql`${t.amountKes} >= 1`),
+  ],
+);
+
+/**
+ * Double-entry ledger in cents. Every transaction (txn_id) sums to zero,
+ * enforced by a deferred trigger. Positive is money held (debit), negative is
+ * money owed or earned (credit). Accounts: mpesa:clearing, platform:fees,
+ * creator:<user id> (what we owe a writer).
+ */
+export const ledgerEntries = pgTable(
+  "ledger_entries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    txnId: uuid("txn_id").notNull(),
+    account: text("account").notNull(),
+    amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
+    currency: text("currency").notNull().default("KES"),
+    tipId: uuid("tip_id").references(() => tips.id, { onDelete: "restrict" }),
+    payoutId: uuid("payout_id").references(() => payouts.id, { onDelete: "restrict" }),
+    memo: text("memo").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("ledger_account_idx").on(t.account, t.createdAt),
+    index("ledger_txn_idx").on(t.txnId),
+    check("ledger_nonzero", sql`${t.amountCents} <> 0`),
+  ],
+);
+
 export type Role = (typeof roleEnum.enumValues)[number];
 export type Tone = (typeof toneEnum.enumValues)[number];
 export type User = typeof users.$inferSelect;
@@ -398,4 +545,7 @@ export type Joke = typeof jokes.$inferSelect;
 export type JokeStatus = (typeof jokeStatusEnum.enumValues)[number];
 export type Delivery = typeof deliveries.$inferSelect;
 export type Comment = typeof comments.$inferSelect;
+export type NotificationType = (typeof notificationTypeEnum.enumValues)[number];
+export type Tip = typeof tips.$inferSelect;
+export type Payout = typeof payouts.$inferSelect;
 export type DeclineReason = (typeof declineReasonEnum.enumValues)[number];

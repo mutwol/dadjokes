@@ -3,6 +3,7 @@ import { and, asc, desc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { AppError, notFound } from "../common/errors";
 import { InjectDb } from "../db/db.module";
+import { NotificationsService } from "../notifications/notifications.service";
 import type { Db, Tx } from "../db/db.module";
 import { subscriptions, userRoles, users } from "../db/schema";
 import type { Creator, ListCreatorsQuery } from "./schemas";
@@ -25,7 +26,10 @@ function decodeCursor(cursor?: string): number {
 
 @Injectable()
 export class CreatorsService {
-  constructor(@InjectDb() private readonly db: Db) {}
+  constructor(
+    @InjectDb() private readonly db: Db,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   /** Writers who finished onboarding, with counts relative to the viewer. */
   private select(viewerId: string, where: SQL | undefined, tx: Tx = this.db) {
@@ -105,10 +109,18 @@ export class CreatorsService {
       .where(and(inArray(users.id, ids), ne(users.id, userId)));
     if (opts.strict && !valid.length) throw notFound("Writer");
     if (!valid.length) return;
-    await tx
+    const added = await tx
       .insert(subscriptions)
       .values(valid.map((v) => ({ subscriberId: userId, creatorId: v.id })))
-      .onConflictDoNothing();
+      .onConflictDoNothing()
+      .returning({ creatorId: subscriptions.creatorId });
+    // Once per subscriber, even if they unsubscribe and come back.
+    for (const a of added) {
+      await this.notifications.notify(
+        { userId: a.creatorId, type: "new_subscriber", actorId: userId, dedupeKey: `subscriber:${userId}` },
+        tx,
+      );
+    }
   }
 
   async unsubscribe(userId: string, creatorId: string) {

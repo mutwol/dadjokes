@@ -2,6 +2,8 @@ import { ApiError, createApiClient, unwrap } from "@daddy-jokes/contracts";
 
 export { ApiError, unwrap };
 export type {
+  Activity,
+  Balance,
   Comment,
   CompleteOnboardingRequest,
   CreateJokeRequest,
@@ -12,6 +14,7 @@ export type {
   Joke,
   JokeStats,
   Me,
+  PayoutTransfer,
   PossibleCopy,
   QueueItem,
   ReportedItem,
@@ -19,6 +22,7 @@ export type {
   Session,
   StudioSummary,
   Submission,
+  Tip,
   Today,
   Topic,
 } from "@daddy-jokes/contracts";

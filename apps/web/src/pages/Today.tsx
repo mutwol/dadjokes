@@ -14,7 +14,7 @@ import { useStore } from "../state/useStore.ts";
 import "./Today.css";
 
 export function Today() {
-  const { account, hasRole, setRole, showToast } = useStore();
+  const { account, hasRole, setRole, showToast, unread } = useStore();
   const [today, setToday] = useState<TodayData | null>(null);
   const [failed, setFailed] = useState(false);
   const [version, setVersion] = useState(0);
@@ -54,8 +54,13 @@ export function Today() {
     <div className="today">
       <header className="today-top">
         <NameTag name="Daddy Jokes" size="s" />
-        <Link to="/activity" className="icon-btn" aria-label="Activity">
+        <Link
+          to="/activity"
+          className="icon-btn today-bell"
+          aria-label={unread ? `Activity, ${unread} new` : "Activity"}
+        >
           <Icon name="bell" />
+          {unread ? <span className="badge-dot" aria-hidden="true" /> : null}
         </Link>
       </header>
 

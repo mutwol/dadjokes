@@ -1,4 +1,5 @@
-import { Link, NavLink, Outlet } from "react-router";
+import { useEffect } from "react";
+import { Link, NavLink, Outlet, useLocation } from "react-router";
 import { useStore } from "../state/useStore.ts";
 import { Icon } from "./Icon.tsx";
 import type { IconName } from "./Icon.tsx";
@@ -13,7 +14,11 @@ const NAV: { to: string; label: string; icon: IconName }[] = [
 ];
 
 export function AppShell() {
-  const { toast } = useStore();
+  const { toast, unread, refreshUnread } = useStore();
+  const { pathname } = useLocation();
+  useEffect(() => {
+    refreshUnread();
+  }, [pathname, refreshUnread]);
   return (
     <div className="shell">
       <aside className="sidebar" aria-label="Main">
@@ -25,6 +30,11 @@ export function AppShell() {
             <NavLink key={n.to} to={n.to} end={n.to === "/"} className="sidebar-link">
               <Icon name={n.icon} />
               {n.label}
+              {n.to === "/activity" && unread ? (
+                <span className="badge" aria-label={`${unread} new`}>
+                  {unread > 99 ? "99+" : unread}
+                </span>
+              ) : null}
             </NavLink>
           ))}
           <NavLink to="/me" className="sidebar-link">

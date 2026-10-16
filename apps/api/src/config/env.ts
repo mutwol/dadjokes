@@ -43,6 +43,31 @@ const EnvSchema = z.object({
     .default("false")
     .transform((v) => v === "true"),
 
+  /** Web Push (VAPID). Generate with `pnpm --filter api push:keys`. Push is off when unset. */
+  VAPID_PUBLIC_KEY: z.string().optional().transform((v) => v || undefined),
+  VAPID_PRIVATE_KEY: z.string().optional().transform((v) => v || undefined),
+  VAPID_SUBJECT: z.string().default("mailto:hello@daddyjokes.local"),
+
+  /**
+   * M-Pesa (Safaricom Daraja). "fake" needs no account: tips and payouts settle
+   * by themselves after a few seconds (phones ending 0000 fail, 1111 cancel).
+   */
+  MPESA_MODE: z.enum(["fake", "sandbox", "production"]).default("fake"),
+  MPESA_CONSUMER_KEY: z.string().optional(),
+  MPESA_CONSUMER_SECRET: z.string().optional(),
+  /** Paybill or till for STK push (tips). */
+  MPESA_SHORTCODE: z.string().optional(),
+  MPESA_PASSKEY: z.string().optional(),
+  /** Public base URL Safaricom calls back, e.g. https://daddyjokes.app */
+  MPESA_CALLBACK_BASE_URL: z.string().optional(),
+  /** B2C (payouts to writers). */
+  MPESA_B2C_SHORTCODE: z.string().optional(),
+  MPESA_B2C_INITIATOR: z.string().optional(),
+  MPESA_B2C_SECURITY_CREDENTIAL: z.string().optional(),
+  /** Platform share of each tip, in percent. */
+  TIP_FEE_PERCENT: z.coerce.number().min(0).max(50).default(10),
+  PAYOUT_MIN_KES: z.coerce.number().int().min(1).default(100),
+
   /** Turns request rate limits off. Only for automated tests. */
   THROTTLE_DISABLED: z
     .enum(["true", "false"])
@@ -51,9 +76,27 @@ const EnvSchema = z.object({
 });
 
 const CheckedEnv = EnvSchema.superRefine((env, ctx) => {
-  if (env.STORAGE_DRIVER !== "s3") return;
-  for (const key of ["S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"] as const) {
-    if (!env[key]) ctx.addIssue({ code: "custom", path: [key], message: "Required when STORAGE_DRIVER=s3" });
+  const require = (keys: readonly (keyof typeof env)[], why: string) => {
+    for (const key of keys) if (!env[key]) ctx.addIssue({ code: "custom", path: [key], message: `Required when ${why}` });
+  };
+  if (env.STORAGE_DRIVER === "s3") require(["S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"], "STORAGE_DRIVER=s3");
+  if (env.MPESA_MODE !== "fake") {
+    require(
+      [
+        "MPESA_CONSUMER_KEY",
+        "MPESA_CONSUMER_SECRET",
+        "MPESA_SHORTCODE",
+        "MPESA_PASSKEY",
+        "MPESA_CALLBACK_BASE_URL",
+        "MPESA_B2C_SHORTCODE",
+        "MPESA_B2C_INITIATOR",
+        "MPESA_B2C_SECURITY_CREDENTIAL",
+      ],
+      `MPESA_MODE=${env.MPESA_MODE}`,
+    );
+  }
+  if (Boolean(env.VAPID_PUBLIC_KEY) !== Boolean(env.VAPID_PRIVATE_KEY)) {
+    ctx.addIssue({ code: "custom", path: ["VAPID_PRIVATE_KEY"], message: "Set both VAPID keys, or neither" });
   }
 });
 

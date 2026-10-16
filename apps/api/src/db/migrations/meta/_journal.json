@@ -43,6 +43,13 @@
       "when": 1792181874972,
       "tag": "0005_engagement",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792183248202,
+      "tag": "0006_money",
+      "breakpoints": true
     }
   ]
 }

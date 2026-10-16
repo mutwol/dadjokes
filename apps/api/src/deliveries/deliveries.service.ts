@@ -4,9 +4,10 @@ import { AppError, notFound } from "../common/errors";
 import { addDays, latestDateNow, localDate, localHour, zonedInstant } from "../common/dates";
 import { InjectDb } from "../db/db.module";
 import type { Db } from "../db/db.module";
-import { deliveries, jokes, subscriptions, userPreferences, userRoles, users } from "../db/schema";
+import { deliveries, jokes, subscriptions, tips, userPreferences, userRoles, users } from "../db/schema";
 import type { Delivery } from "../db/schema";
 import { JokesService } from "../jokes/jokes.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { StorageService } from "../storage/storage.service";
 import type { DeliveryCard, ReaderJoke, ReactionKind, Today } from "./schemas";
 
@@ -32,6 +33,7 @@ export class DeliveriesService {
     @InjectDb() private readonly db: Db,
     private readonly jokes: JokesService,
     private readonly storage: StorageService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /** Lets other modules add to a joke's stats (reactions, comments) without a circular import. */
@@ -97,7 +99,10 @@ export class DeliveriesService {
       .update(jokes)
       .set({ status: "delivered" })
       .where(and(eq(jokes.status, "scheduled"), lte(jokes.deliverOn, latestDateNow(now))))
-      .returning({ id: jokes.id });
+      .returning({ id: jokes.id, creatorId: jokes.creatorId });
+    for (const j of started) {
+      await this.notifications.notify({ userId: j.creatorId, type: "joke_delivered", jokeId: j.id, dedupeKey: `delivered:${j.id}` });
+    }
     return started.length;
   }
 
@@ -105,10 +110,31 @@ export class DeliveriesService {
   async run(now = new Date()) {
     const started = await this.markStartedDays(now);
     const delivered = await this.deliverDue(now);
+    await this.pushDelivered(delivered);
     if (started || delivered.length) {
       this.logger.log(`Delivered ${delivered.length} jokes; ${started} jokes went out for the first time`);
     }
     return delivered;
+  }
+
+  /** "Today's joke is here" on readers' devices. */
+  private async pushDelivered(rows: DeliveredRow[]) {
+    if (!rows.length || !this.notifications.pushEnabled) return;
+    const names = await this.db
+      .select({ id: jokes.id, name: users.name, handle: users.handle })
+      .from(jokes)
+      .innerJoin(users, eq(users.id, jokes.creatorId))
+      .where(inArray(jokes.id, [...new Set(rows.map((r) => r.jokeId))]));
+    await this.notifications.sendPushBulk(
+      rows.map((r) => {
+        const who = names.find((n) => n.id === r.jokeId);
+        const first = (who?.name ?? who?.handle ?? "Someone").split(" ")[0];
+        return {
+          userId: r.userId,
+          payload: { title: "Today's joke is here", body: `${first} picked it for you. Open it within a day.`, url: "/", tag: "daily-joke" },
+        };
+      }),
+    );
   }
 
   async today(userId: string, now = new Date()): Promise<Today> {
@@ -290,7 +316,11 @@ export class DeliveriesService {
       .from(deliveries)
       .innerJoin(jokes, eq(jokes.id, deliveries.jokeId))
       .where(and(eq(jokes.creatorId, creatorId), ne(deliveries.userId, creatorId)));
-    return { ...counts, ...reach, tipsKes: 0 };
+    const [paid] = await this.db
+      .select({ kes: sql<number>`coalesce(sum(${tips.amountKes}), 0)::int` })
+      .from(tips)
+      .where(and(eq(tips.creatorId, creatorId), eq(tips.status, "paid")));
+    return { ...counts, ...reach, tipsKes: paid.kes };
   }
 
   private async cards(userId: string, from: string, to: string, now: Date): Promise<DeliveryCard[]> {

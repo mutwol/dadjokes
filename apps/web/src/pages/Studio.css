@@ -173,3 +173,60 @@
   font-size: 6.5px;
   padding: 6px;
 }
+
+.tips-panel {
+  padding: 16px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  display: grid;
+  gap: 12px;
+}
+
+.tips-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tips-head h2 {
+  font-size: var(--step-1);
+}
+
+.tips-balance strong {
+  font-size: var(--step-2);
+}
+
+.tips-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.tips-form input {
+  font: inherit;
+  font-weight: 700;
+  width: 130px;
+  padding: 8px 10px;
+  min-height: 40px;
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+}
+
+.tips-transfers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.tips-transfers li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 700;
+}

@@ -19,14 +19,17 @@ and the worker. Vite proxies `/v1` to the API on port 3000, so no CORS setup is 
 | `/studio` | Creator studio: reach, your submissions, their curation status, withdraw |
 | `/curate` | Curators: review queue with possible copies, calendar of picks, schedule or decline |
 | `/me` | Profile: switch reading and writing on or off, delivery time, payouts, sign out |
-| `/explore`, `/activity` | Placeholders for later steps |
+| `/activity` | Activity: picks, comments, subscribers, tips and payouts, newest first |
+| `/explore` | Placeholder for a later step |
 
 ## What's real and what's still mock
 
 Real, through the API: sign-in, onboarding, the account, roles, preferences, writers and
 subscriptions, submitting jokes (text or image) and Studio, curation (`/curate`, for curators),
 Today, opening the daily joke and joke detail, reactions, comments (with live counts), reports,
-sharing and Studio stats. Tips are not connected yet.
+sharing, Studio stats, the Activity feed, push notifications (Profile, or onboarding), tipping
+with M-Pesa and withdrawing tips. In development M-Pesa runs in a fake mode: a tip settles
+after about 3 seconds; numbers ending 0000 fail and 1111 cancel.
 
 To try curation, sign in as `curator@daddyjokes.local` (seeded; the code is in the API log).
 

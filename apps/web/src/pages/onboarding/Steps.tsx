@@ -12,6 +12,7 @@ import { compact } from "../../data/reactions.ts";
 import type { Role } from "../../data/types.ts";
 import { useStore } from "../../state/useStore.ts";
 import { firstName, handleFromName, useFlow } from "./flow.ts";
+import { enablePush } from "../../api/push.ts";
 import { googleEnabled } from "../../config.ts";
 import { GoogleSignIn } from "./GoogleSignIn.tsx";
 
@@ -689,12 +690,7 @@ export function DeliveryStep() {
   const [ios] = useState(isIosBrowser);
 
   const enable = async () => {
-    if (!("Notification" in window)) {
-      update({ notifications: "unsupported" });
-      return;
-    }
-    const result = await Notification.requestPermission();
-    update({ notifications: result === "granted" ? "on" : result === "denied" ? "denied" : "off" });
+    update({ notifications: await enablePush().catch(() => "off" as const) });
   };
 
   const status = {

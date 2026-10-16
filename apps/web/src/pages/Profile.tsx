@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { api } from "../api/client.ts";
+import { disablePush, enablePush } from "../api/push.ts";
 import type { Creator } from "../api/client.ts";
 import { Avatar } from "../components/Avatar.tsx";
 import { NameTag } from "../components/NameTag.tsx";
@@ -26,7 +27,36 @@ const titleCase = (slug: string) => slug.charAt(0).toUpperCase() + slug.slice(1)
 
 export function Profile() {
   const navigate = useNavigate();
-  const { account, hasRole, setRole, deliveryHour, setDeliveryHour, notifications, signOut, showToast } = useStore();
+  const { account, hasRole, setRole, deliveryHour, setDeliveryHour, notifications, setNotifications, signOut, showToast } =
+    useStore();
+  const [pushBusy, setPushBusy] = useState(false);
+
+  const togglePush = async () => {
+    setPushBusy(true);
+    try {
+      if (notifications === "on") {
+        await disablePush();
+        setNotifications("off");
+        showToast("Notifications are off on this device.");
+      } else {
+        const result = await enablePush();
+        setNotifications(result);
+        showToast(
+          result === "on"
+            ? "Notifications are on. We'll tell you when your joke lands."
+            : result === "denied"
+              ? "Notifications are blocked in your browser settings."
+              : result === "unsupported"
+                ? "This browser can't show notifications."
+                : "Notifications stay off.",
+        );
+      }
+    } catch {
+      showToast("Couldn't change notifications. Try again.");
+    } finally {
+      setPushBusy(false);
+    }
+  };
   const [subscriptions, setSubscriptions] = useState<Creator[] | null>(null);
   const [busyRole, setBusyRole] = useState<Role | null>(null);
 
@@ -143,7 +173,17 @@ export function Profile() {
             </div>
             <div>
               <dt>Notifications on this device</dt>
-              <dd>{notifications === "on" ? "On" : "Off"}</dd>
+              <dd>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={notifications === "on"}
+                  aria-label="Notifications on this device"
+                  className="switch"
+                  disabled={pushBusy || notifications === "unsupported"}
+                  onClick={() => void togglePush()}
+                />
+              </dd>
             </div>
             <div>
               <dt>Topics</dt>

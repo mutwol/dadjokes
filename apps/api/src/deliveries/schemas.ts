@@ -95,6 +95,6 @@ export const StudioSummarySchema = named(
     inReview: z.number().int(),
     reached: z.number().int().describe("Readers your jokes were delivered to."),
     opened: z.number().int(),
-    tipsKes: z.number(),
+    tipsKes: z.number().describe("Tips paid for your jokes, before the platform fee."),
   }),
 );
