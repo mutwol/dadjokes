@@ -370,3 +370,18 @@
     align-items: start;
   }
 }
+
+.today-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-m);
+  background: #fff8d6;
+  border: 1px solid #f2dc7a;
+}
+
+.today-banner p {
+  flex: 1;
+  font-size: var(--step--1);
+}

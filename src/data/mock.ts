@@ -10,12 +10,28 @@ export const TODAY = "2026-10-16";
 /** The reader's chosen delivery time for their daily joke (24h, local). */
 export const DEFAULT_DELIVERY_HOUR = 8;
 
+/** Reader stats that would come from the API. */
 export const ME = {
-  name: "Cyrus",
-  handle: "cyrus",
   streak: 4,
   plan: "free" as "free" | "plus",
 };
+
+export const TOPICS = ["Wordplay", "Food", "School", "Work", "Animals", "Kids", "Science", "Sports"];
+
+export const COUNTRIES = [
+  "Kenya",
+  "Nigeria",
+  "South Africa",
+  "Uganda",
+  "Tanzania",
+  "United Kingdom",
+  "United States",
+  "Mexico",
+  "Somewhere else",
+];
+
+/** Handles the mock API treats as already taken. */
+export const TAKEN_HANDLES = new Set(["dad", "daddy", "wanjiru_puns", "grillmaster_dan", "baba_otieno"]);
 
 export const creators: Creator[] = [
   {

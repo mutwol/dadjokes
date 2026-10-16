@@ -5,7 +5,7 @@ import { Avatar } from "../components/Avatar.tsx";
 import { Icon } from "../components/Icon.tsx";
 import { GroanMeter, ReactionBar } from "../components/Reactions.tsx";
 import { StoryCard } from "../components/StoryCard.tsx";
-import { ME, creatorById, jokeById, longDate } from "../data/mock.ts";
+import { creatorById, jokeById, longDate } from "../data/mock.ts";
 import { compact, totalReactions } from "../data/reactions.ts";
 import { useStore } from "../state/useStore.ts";
 import "./JokeDetail.css";
@@ -16,7 +16,7 @@ export function JokeDetail() {
   const { id = "" } = useParams();
   const joke = jokeById(id);
   const navigate = useNavigate();
-  const { reactionsFor, myReaction, react, commentsFor, addComment, showToast } = useStore();
+  const { reactionsFor, myReaction, react, commentsFor, addComment, showToast, profile } = useStore();
   const [draft, setDraft] = useState("");
   const [tipOpen, setTipOpen] = useState(false);
   const [tip, setTip] = useState(50);
@@ -154,7 +154,7 @@ export function JokeDetail() {
         <section className="detail-section detail-comments" aria-labelledby="comments-title">
           <h2 id="comments-title">Comments ({comments.length})</h2>
           <form className="comment-form" onSubmit={post}>
-            <Avatar name={ME.name} tone="navy" size={36} />
+            <Avatar name={profile?.name ?? "You"} tone="navy" size={36} />
             <label className="visually-hidden" htmlFor="comment">
               Add a comment
             </label>

@@ -172,56 +172,6 @@
   border-color: var(--ink);
 }
 
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.chip {
-  min-height: 36px;
-  padding: 0 14px;
-  border-radius: 999px;
-  border: 2px solid var(--line-strong);
-  background: var(--paper);
-  font-weight: 700;
-  font-size: var(--step--1);
-}
-
-.chip.is-on {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: #fff;
-}
-
-.chip:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.original {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  padding: 14px 16px;
-  border-radius: var(--radius-m);
-  background: #fff8d6;
-  cursor: pointer;
-}
-
-.original input {
-  width: 22px;
-  height: 22px;
-  margin: 1px 0 0;
-  accent-color: var(--ink);
-  flex-shrink: 0;
-}
-
-.original > span {
-  display: grid;
-  gap: 2px;
-}
-
 .create-submit {
   display: grid;
   gap: 8px;

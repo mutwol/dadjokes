@@ -20,7 +20,7 @@ import { useStore } from "../state/useStore.ts";
 import "./Today.css";
 
 export function Today() {
-  const { seen } = useStore();
+  const { seen, profile, hasRole, addRole, showToast } = useStore();
   const joke = jokeForDay(TODAY);
   const opened = seen.has(TODAY);
 
@@ -35,10 +35,29 @@ export function Today() {
 
       <div className="today-grid">
         <section className="today-main" aria-labelledby="today-title">
-          <p className="today-hi">Hi {ME.name}, I'm Dad.</p>
+          <p className="today-hi">Hi {profile?.name.split(" ")[0] ?? "there"}, I'm Dad.</p>
           <h1 id="today-title" className="today-title">
             {longDate(TODAY)}
           </h1>
+
+          {hasRole("reader") ? null : (
+            <div className="today-banner">
+              <p>
+                <strong>You're not getting the daily joke.</strong> Turn it on to get one at your chosen
+                time.
+              </p>
+              <button
+                type="button"
+                className="btn btn-primary btn-small"
+                onClick={() => {
+                  addRole("reader");
+                  showToast("Daily jokes are on.");
+                }}
+              >
+                Turn on
+              </button>
+            </div>
+          )}
 
           <WeekRail />
 
@@ -255,7 +274,13 @@ function StreakCard() {
 }
 
 function CreatorsCard() {
-  const { showToast } = useStore();
+  const { showToast, profile, updateProfile } = useStore();
+  const following = profile?.following ?? [];
+  const toggle = (id: string, name: string) => {
+    const on = following.includes(id);
+    updateProfile({ following: on ? following.filter((x) => x !== id) : [...following, id] });
+    showToast(on ? `Unsubscribed from ${name}` : `Subscribed to ${name}`);
+  };
   return (
     <section className="panel">
       <h2 className="panel-title">Most groaned at this month</h2>
@@ -263,22 +288,29 @@ function CreatorsCard() {
         {[...creators]
           .sort((a, b) => b.subscribers - a.subscribers)
           .slice(0, 4)
-          .map((c) => (
-            <li key={c.id}>
-              <Avatar name={c.name} tone={c.tone} size={36} />
-              <div className="creator-list-text">
-                <p className="byline-name">{c.name}</p>
-                <p className="byline-sub">{compact(c.subscribers)} subscribers</p>
-              </div>
-              <button
-                type="button"
-                className="btn btn-quiet btn-small"
-                onClick={() => showToast(`Subscribed to ${c.name.split(" ")[0]}`)}
-              >
-                Subscribe
-              </button>
-            </li>
-          ))}
+          .map((c) => {
+            const on = following.includes(c.id);
+            const first = c.name.split(" ")[0];
+            return (
+              <li key={c.id}>
+                <Avatar name={c.name} tone={c.tone} size={36} />
+                <div className="creator-list-text">
+                  <p className="byline-name">{c.name}</p>
+                  <p className="byline-sub">{compact(c.subscribers)} subscribers</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-quiet btn-small"
+                  aria-pressed={on}
+                  aria-label={`${on ? "Unsubscribe from" : "Subscribe to"} ${c.name}`}
+                  onClick={() => toggle(c.id, first)}
+                >
+                  {on ? <Icon name="check" size={16} /> : null}
+                  {on ? "Subscribed" : "Subscribe"}
+                </button>
+              </li>
+            );
+          })}
       </ul>
     </section>
   );

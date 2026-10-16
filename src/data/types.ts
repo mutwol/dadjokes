@@ -62,3 +62,24 @@ export interface Submission {
   scheduledFor?: string;
   deliveredTo?: number;
 }
+
+/** A person can read (get the daily joke), write (submit jokes), or both. */
+export type Role = "reader" | "writer";
+
+export type NotificationState = "on" | "off" | "denied" | "unsupported";
+
+export interface Profile {
+  email: string;
+  name: string;
+  handle: string;
+  country: string;
+  bio: string;
+  roles: Role[];
+  topics: string[];
+  /** "everywhere" or "local": whether to favour jokes from the reader's country. */
+  jokeOrigin: "everywhere" | "local";
+  following: string[];
+  deliveryHour: number;
+  notifications: NotificationState;
+  payout: { method: "mpesa"; phone: string } | { method: "later" };
+}

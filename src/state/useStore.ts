@@ -1,7 +1,16 @@
 import { createContext, useContext } from "react";
-import type { Comment, Joke, ReactionKind, Submission } from "../data/types.ts";
+import type { Comment, Joke, Profile, ReactionKind, Role, Submission } from "../data/types.ts";
 
 export interface Store {
+  /** The signed-in person, or null before onboarding is finished. */
+  profile: Profile | null;
+  completeOnboarding: (p: Profile) => void;
+  updateProfile: (patch: Partial<Profile>) => void;
+  hasRole: (r: Role) => boolean;
+  addRole: (r: Role) => void;
+  removeRole: (r: Role) => void;
+  signOut: () => void;
+
   seen: Set<string>;
   markSeen: (day: string) => void;
   myReaction: (jokeId: string) => ReactionKind | undefined;
