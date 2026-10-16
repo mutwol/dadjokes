@@ -1,54 +1,36 @@
-# Daddy Jokes (web)
+# Daddy Jokes
 
-One curated dad joke a day, delivered like a status. Mobile-first UI prototype.
+One curated dad joke a day, delivered like a status. Anyone can read, write, or both.
 
-Stack: Vite, React 19 with the React Compiler, React Router, Tailwind v4, oxlint.
+| Package | What it is |
+| --- | --- |
+| `apps/web` | React app (Vite, React Router, Tailwind). See its README for screens and design. |
+| `apps/api` | NestJS API and background worker, PostgreSQL, Redis |
+| `packages/contracts` | OpenAPI spec and the typed API client the web app uses |
+| `docs/backend-architecture.md` | How the backend is designed and what comes next |
+
+## Getting started
+
+Needs Node 22.12+, pnpm and Docker.
 
 ```bash
 pnpm install
-pnpm dev      # http://localhost:5173
-pnpm lint
-pnpm build
+pnpm db:up                       # Postgres, Redis and Mailpit in Docker
+cp apps/api/.env.example apps/api/.env
+pnpm db:migrate && pnpm db:seed  # tables, topics and sample writers
+pnpm dev                         # web on :5173, API on :3000, plus the worker
 ```
 
-## Screens
+Open http://localhost:5173 and sign up. The sign-in code is printed in the API's log and
+also lands in Mailpit at http://localhost:8025. API docs: http://localhost:3000/docs.
 
-| Route | Screen |
+## Everyday commands
+
+| Command | Does |
 | --- | --- |
-| `/welcome` | Onboarding: email, 6-digit code, role (reader, writer or both), profile, then reader steps (topics, writers to subscribe to, delivery time and notifications) and writer steps (tip payouts, originality pledge). Steps adapt to the roles picked |
-| `/` | Today: this week's status rings, today's joke (sealed until opened), streak, delivery time |
-| `/view/:id` | Status viewer: setup, then the punchline after a pause. Tap right/left or use the arrow keys, hold to pause, Esc to close |
-| `/joke/:id` | Joke detail: creator, subscribe, tip, reactions, groan meter, comments |
-| `/create` | Write a joke: setup and punchline or an image, background, region, topics, originality check, live preview |
-| `/studio` | Creator studio: your submissions and their curation status |
-| `/me` | Profile: switch reading and writing on or off, delivery time, payouts, sign out |
-| `/explore`, `/activity` | Placeholders for later steps |
-
-## Trying the onboarding
-
-The profile is saved in localStorage, so a reload keeps you signed in. Use **Sign out** on the
-Profile page to go through onboarding again. In the code step any 6 digits work, except `000000`,
-which shows the error state.
-
-## How it's organised
-
-- `src/data/` holds types and mock data (`mock.ts`). The shapes mirror what an API would return,
-  so replacing the mock module with real fetches is a contained change.
-- `src/state/` is the store: the profile and roles (saved in localStorage), plus in-memory
-  reactions, comments, seen days and submissions.
-- `src/pages/onboarding/` holds the sign-up flow. `flow.ts` decides the step order from the roles
-  picked; `components/RoleGate.tsx` guards signed-in and writer-only screens.
-- `src/components/` holds shared pieces: `StoryCard` (the joke face used everywhere), `NameTag`
-  (the "Hello, my name is" sticker used as logo and byline), `Reactions` (reaction bar and groan
-  meter) and `AppShell` (bottom tab bar on mobile, left rail on desktop).
-- `src/styles/tokens.css` defines the palette, type and radii. `src/index.css` exposes the
-  colours to Tailwind (`bg-tag-red`, `text-ink-soft`, `font-marker` and so on), so new UI can use
-  utilities while the existing screens use plain CSS next to each component.
-
-## Design direction
-
-- Palette: fridge white, polo navy, name-tag red, highlighter yellow, lawn green, denim.
-- Type: Atkinson Hyperlegible Next for the interface and setups; Permanent Marker only for
-  punchlines and names on stickers.
-- The one memorable moment is the punchline reveal: a highlighter swipe after the setup.
-  Reduced-motion users get no auto-advance and tap to reveal instead.
+| `pnpm dev` | Web, API and worker with reload |
+| `pnpm test` | API end-to-end tests against the `daddy_jokes_test` database (`pnpm db:up` creates it) |
+| `pnpm lint` | Type checks and lint for every package |
+| `pnpm build` | Production builds |
+| `pnpm contracts` | After changing an endpoint: re-export the OpenAPI spec and regenerate the client |
+| `pnpm --filter api db:generate` | After changing `apps/api/src/db/schema.ts`: write a new SQL migration |

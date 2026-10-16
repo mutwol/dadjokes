@@ -1,0 +1,1389 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/v1/me": {
+      "get": {
+        "operationId": "getMe",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The signed-in person",
+        "tags": [
+          "me"
+        ]
+      },
+      "patch": {
+        "operationId": "updateMe",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Handle taken (code: handle_taken)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update name, handle, country, bio or time zone",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/onboarding": {
+      "post": {
+        "description": "Profile, roles, preferences, subscriptions and an optional payout method, in one transaction.",
+        "operationId": "completeOnboarding",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteOnboardingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Handle taken, or already onboarded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Save everything from onboarding at once",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/roles": {
+      "put": {
+        "operationId": "replaceMyRoles",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceRolesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Empty list (keep at least one)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Turn reading and writing on or off",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/preferences": {
+      "patch": {
+        "operationId": "updateMyPreferences",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePreferencesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delivery hour, joke origin and topics",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/payout-method": {
+      "put": {
+        "operationId": "setMyPayoutMethod",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayoutMethodRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Writing is off (code: role_required)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Where tips are paid (writers only)",
+        "tags": [
+          "me"
+        ]
+      },
+      "delete": {
+        "operationId": "removeMyPayoutMethod",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove the payout method",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/handles/{handle}/availability": {
+      "get": {
+        "operationId": "checkHandle",
+        "parameters": [
+          {
+            "name": "handle",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandleAvailability"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Whether a username is free, with a suggestion if not",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/topics": {
+      "get": {
+        "operationId": "listTopics",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicList"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Joke topics people can pick",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/v1/creators": {
+      "get": {
+        "operationId": "listCreators",
+        "parameters": [
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "popular",
+              "type": "string",
+              "enum": [
+                "popular",
+                "new"
+              ]
+            }
+          },
+          {
+            "name": "country",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 56
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatorPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List writers, most subscribed first by default",
+        "tags": [
+          "creators"
+        ]
+      }
+    },
+    "/v1/creators/{handle}": {
+      "get": {
+        "operationId": "getCreator",
+        "parameters": [
+          {
+            "name": "handle",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Creator"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No writer with that handle",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A writer's public profile",
+        "tags": [
+          "creators"
+        ]
+      }
+    },
+    "/v1/me/subscriptions": {
+      "get": {
+        "operationId": "listMySubscriptions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatorList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Writers I subscribe to",
+        "tags": [
+          "subscriptions"
+        ]
+      }
+    },
+    "/v1/me/subscriptions/{creatorId}": {
+      "put": {
+        "operationId": "subscribe",
+        "parameters": [
+          {
+            "name": "creatorId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Subscribed"
+          },
+          "404": {
+            "description": "No writer with that id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Tried to subscribe to yourself",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Subscribe to a writer. Safe to repeat.",
+        "tags": [
+          "subscriptions"
+        ]
+      },
+      "delete": {
+        "operationId": "unsubscribe",
+        "parameters": [
+          {
+            "name": "creatorId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Unsubscribed"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Unsubscribe from a writer. Safe to repeat.",
+        "tags": [
+          "subscriptions"
+        ]
+      }
+    },
+    "/v1/auth/email/start": {
+      "post": {
+        "operationId": "startEmailSignIn",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartEmailRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Code sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartEmailResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Asked too soon or too often (codes: resend_too_soon, too_many_codes)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Email a 6-digit sign-in code",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/email/verify": {
+      "post": {
+        "operationId": "verifyEmailSignIn",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyEmailRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Wrong or expired code (codes: code_invalid, code_expired)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many wrong tries (code: code_locked)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Exchange the code for a session",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/google": {
+      "post": {
+        "operationId": "googleSignIn",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleSignInRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Sign in with a Google ID token",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/refresh": {
+      "post": {
+        "operationId": "refreshSession",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessToken"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Signed out or expired (code: session_expired)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "dj_refresh": []
+          }
+        ],
+        "summary": "New access token from the refresh cookie",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/logout": {
+      "post": {
+        "operationId": "logout",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Signed out"
+          }
+        },
+        "security": [
+          {
+            "dj_refresh": []
+          }
+        ],
+        "summary": "Sign out this device",
+        "tags": [
+          "auth"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Daddy Jokes API",
+    "description": "One dad joke a day. Errors use RFC 9457 problem details with a stable `code`. Send the access token as `Authorization: Bearer <token>`; refresh it with POST /v1/auth/refresh.",
+    "version": "1",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      },
+      "cookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "dj_refresh"
+      }
+    },
+    "schemas": {
+      "Problem": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "code": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "instance": {
+            "type": "string"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "message"
+              ]
+            }
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code"
+        ]
+      },
+      "Preferences": {
+        "type": "object",
+        "properties": {
+          "deliveryHour": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 23
+          },
+          "jokeOrigin": {
+            "type": "string",
+            "enum": [
+              "everywhere",
+              "local"
+            ]
+          },
+          "topics": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "deliveryHour",
+          "jokeOrigin",
+          "topics"
+        ]
+      },
+      "Payout": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "mpesa"
+            ]
+          },
+          "phoneLast3": {
+            "type": "string"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "method",
+          "phoneLast3",
+          "verified"
+        ]
+      },
+      "Me": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "name": {
+            "nullable": true,
+            "type": "string"
+          },
+          "handle": {
+            "nullable": true,
+            "type": "string"
+          },
+          "country": {
+            "nullable": true,
+            "type": "string"
+          },
+          "bio": {
+            "type": "string"
+          },
+          "tone": {
+            "type": "string",
+            "enum": [
+              "red",
+              "navy",
+              "yellow",
+              "green",
+              "denim"
+            ]
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "reader",
+                "writer",
+                "curator",
+                "admin"
+              ]
+            }
+          },
+          "preferences": {
+            "$ref": "#/components/schemas/Preferences"
+          },
+          "payout": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Payout"
+              }
+            ]
+          },
+          "onboarded": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "name",
+          "handle",
+          "country",
+          "bio",
+          "tone",
+          "timezone",
+          "roles",
+          "preferences",
+          "payout",
+          "onboarded",
+          "createdAt"
+        ]
+      },
+      "UpdateMeRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 60
+          },
+          "handle": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]{3,20}$"
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 56
+          },
+          "bio": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "timezone": {
+            "type": "string"
+          }
+        }
+      },
+      "ReplaceRolesRequest": {
+        "type": "object",
+        "properties": {
+          "roles": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "reader",
+                "writer"
+              ]
+            }
+          }
+        },
+        "required": [
+          "roles"
+        ]
+      },
+      "UpdatePreferencesRequest": {
+        "type": "object",
+        "properties": {
+          "deliveryHour": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 23
+          },
+          "jokeOrigin": {
+            "type": "string",
+            "enum": [
+              "everywhere",
+              "local"
+            ]
+          },
+          "topics": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "PayoutMethodRequest": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "mpesa"
+            ]
+          },
+          "phone": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "method",
+          "phone"
+        ]
+      },
+      "CompleteOnboardingRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 60
+          },
+          "handle": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]{3,20}$"
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 56
+          },
+          "bio": {
+            "default": "",
+            "type": "string",
+            "maxLength": 80
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "roles": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "reader",
+                "writer"
+              ]
+            }
+          },
+          "topics": {
+            "default": [],
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "jokeOrigin": {
+            "default": "everywhere",
+            "type": "string",
+            "enum": [
+              "everywhere",
+              "local"
+            ]
+          },
+          "deliveryHour": {
+            "default": 8,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 23
+          },
+          "following": {
+            "default": [],
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "payout": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PayoutMethodRequest"
+              }
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "handle",
+          "country",
+          "timezone",
+          "roles"
+        ]
+      },
+      "HandleAvailability": {
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "invalid",
+              "reserved",
+              "taken"
+            ]
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "handle",
+          "available"
+        ]
+      },
+      "Topic": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "label"
+        ]
+      },
+      "TopicList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Topic"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "Creator": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "handle": {
+            "type": "string"
+          },
+          "country": {
+            "nullable": true,
+            "type": "string"
+          },
+          "bio": {
+            "type": "string"
+          },
+          "tone": {
+            "type": "string",
+            "enum": [
+              "red",
+              "navy",
+              "yellow",
+              "green",
+              "denim"
+            ]
+          },
+          "subscriberCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "isSubscribed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "handle",
+          "country",
+          "bio",
+          "tone",
+          "subscriberCount",
+          "isSubscribed"
+        ]
+      },
+      "CreatorPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Creator"
+            }
+          },
+          "nextCursor": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "CreatorList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Creator"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "StartEmailRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 254
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "StartEmailResponse": {
+        "type": "object",
+        "properties": {
+          "expiresInSeconds": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "resendAfterSeconds": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "expiresInSeconds",
+          "resendAfterSeconds"
+        ]
+      },
+      "VerifyEmailRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 254
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^\\d{6}$"
+          }
+        },
+        "required": [
+          "email",
+          "code"
+        ]
+      },
+      "GoogleSignInRequest": {
+        "type": "object",
+        "properties": {
+          "idToken": {
+            "type": "string",
+            "minLength": 10
+          }
+        },
+        "required": [
+          "idToken"
+        ]
+      },
+      "Session": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "expiresInSeconds": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "isNew": {
+            "type": "boolean"
+          },
+          "user": {
+            "$ref": "#/components/schemas/Me"
+          }
+        },
+        "required": [
+          "accessToken",
+          "expiresInSeconds",
+          "isNew",
+          "user"
+        ]
+      },
+      "AccessToken": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "expiresInSeconds": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "accessToken",
+          "expiresInSeconds"
+        ]
+      }
+    }
+  }
+}

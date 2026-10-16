@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "sourceRoot": "src",
+  "compilerOptions": {
+    "deleteOutDir": true,
+    "builder": "tsc",
+    "assets": [
+      {
+        "include": "db/migrations/**/*",
+        "outDir": "dist"
+      }
+    ]
+  }
+}

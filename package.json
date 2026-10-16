@@ -1,34 +1,22 @@
 {
-  "name": "web",
+  "name": "daddy-jokes",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
+  "packageManager": "pnpm@12.11.2",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "oxlint",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "@fontsource-variable/atkinson-hyperlegible-next": "^5.3.0",
-    "@fontsource/permanent-marker": "^5.3.0",
-    "@tailwindcss/vite": "^4.3.3",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "react-router": "^8.4.0",
-    "tailwindcss": "^4.3.3"
-  },
-  "devDependencies": {
-    "@babel/core": "^7.29.7",
-    "@rolldown/plugin-babel": "^0.2.3",
-    "@types/babel__core": "^7.20.5",
-    "@types/node": "^24.13.3",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.7",
-    "@vitejs/plugin-react": "^6.1.1",
-    "babel-plugin-react-compiler": "^1.0.0",
-    "oxlint": "^1.81.0",
-    "typescript": "~6.0.2",
-    "vite": "^8.3.0"
+    "dev": "pnpm --parallel --filter web --filter api run \"/^dev/\"",
+    "dev:web": "pnpm --filter web dev",
+    "dev:api": "pnpm --filter api dev",
+    "dev:worker": "pnpm --filter api dev:worker",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "db:up": "docker compose up -d",
+    "db:migrate": "pnpm --filter api db:migrate",
+    "db:seed": "pnpm --filter api db:seed",
+    "contracts": "pnpm --filter api openapi && pnpm --filter @daddy-jokes/contracts generate"
   }
 }

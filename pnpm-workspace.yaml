@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Dependencies allowed to run install scripts.
+allowBuilds:
+  '@scarf/scarf': false
+  '@swc/core': true
+  esbuild: true
+  msgpackr-extract: true
