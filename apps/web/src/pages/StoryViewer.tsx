@@ -11,7 +11,9 @@ import { StoryCard } from "../components/StoryCard.tsx";
 import { shortDate } from "../data/dates.ts";
 import { faceOf } from "../data/face.ts";
 import { useStore } from "../state/useStore.ts";
-import "./StoryViewer.css";
+import { IconButton, Toast, cn } from "../components/ui/index.ts";
+
+const viewer = "fixed inset-0 z-50 grid animate-viewer-in place-items-center bg-ink";
 
 /** How long each part stays up before moving on, in ms. */
 const SETUP_MS = 5000;
@@ -56,7 +58,7 @@ export function StoryViewer() {
     };
   }, [id, navigate, showToast]);
 
-  if (!joke) return <div className="viewer" role="dialog" aria-modal="true" aria-label="Opening the joke" aria-busy="true" />;
+  if (!joke) return <div className={viewer} role="dialog" aria-modal="true" aria-label="Opening the joke" aria-busy="true" />;
   return <Viewer key={joke.id} joke={joke} />;
 }
 
@@ -149,23 +151,27 @@ function Viewer({ joke }: { joke: Joke }) {
 
   return (
     <div
-      className="viewer"
+      className={viewer}
       role="dialog"
       aria-modal="true"
       aria-label={`Today's joke from ${creator.name}`}
     >
-      <div className="viewer-frame">
+      <div className="relative h-dvh w-full overflow-hidden select-none sm:aspect-[9/16] sm:h-[min(92dvh,860px)] sm:w-auto sm:rounded-3xl sm:shadow-frame">
         <StoryCard face={faceOf(joke)} revealed={revealed} variant="full" animate={!reduced} />
 
-        <div className="viewer-top">
-          <div className="progress" aria-hidden="true">
+        <div className="absolute inset-x-0 top-0 z-3 grid gap-3 bg-linear-to-b from-black/22 to-transparent px-3 pt-[calc(10px+env(safe-area-inset-top))] pb-3 text-white">
+          <div className="flex gap-1" aria-hidden="true">
             {Array.from({ length: steps }, (_, i) => {
               const state = i < step ? "done" : i === step ? "active" : "todo";
               const ms = i === 0 && steps === 2 ? SETUP_MS : PUNCHLINE_MS;
               return (
-                <span key={i} className="progress-track">
+                <span key={i} className="h-[3px] flex-1 overflow-hidden rounded-[3px] bg-white/40">
                   <span
-                    className={`progress-fill is-${state}${reduced ? " is-static" : ""}`}
+                    className={cn(
+                      "block size-full origin-left bg-white [transform:scaleX(0)]",
+                      state === "done" && "[transform:scaleX(1)]",
+                      state === "active" && (reduced ? "[transform:scaleX(1)]" : "animate-progress"),
+                    )}
                     style={{
                       animationDuration: `${ms}ms`,
                       animationPlayState: paused ? "paused" : "running",
@@ -176,20 +182,20 @@ function Viewer({ joke }: { joke: Joke }) {
               );
             })}
           </div>
-          <div className="viewer-byline">
+          <div className="flex items-center gap-3">
             <NameTag name={creator.name.split(" ")[0]} size="s" tilt={-4} />
-            <p className="viewer-when">
+            <p className="flex-1 text-sm font-bold [text-shadow:0_1px_2px_rgb(0_0_0/0.3)]">
               {joke.deliverOn ? shortDate(joke.deliverOn) : "Preview"}
-              <span className="visually-hidden">, from {creator.name}</span>
+              <span className="sr-only">, from {creator.name}</span>
             </p>
-            <button type="button" className="viewer-close" onClick={close} aria-label="Close">
+            <IconButton tone="white" onClick={close} aria-label="Close">
               <Icon name="close" />
-            </button>
+            </IconButton>
           </div>
         </div>
 
         <div
-          className="viewer-tap"
+          className="absolute inset-0 z-2 cursor-pointer touch-manipulation"
           onPointerDown={onPointerDown}
           onPointerUp={onPointerUp}
           onPointerCancel={() => {
@@ -199,7 +205,7 @@ function Viewer({ joke }: { joke: Joke }) {
           onContextMenu={(e) => e.preventDefault()}
         />
 
-        <p className="visually-hidden" aria-live="polite">
+        <p className="sr-only" aria-live="polite">
           {joke.kind === "text"
             ? revealed
               ? `Punchline: ${joke.punchline}`
@@ -207,9 +213,13 @@ function Viewer({ joke }: { joke: Joke }) {
             : joke.caption}
         </p>
 
-        <div className="viewer-bottom">
+        <div className="absolute inset-x-0 bottom-0 z-3 grid gap-2.5 bg-linear-to-b from-transparent to-black/28 px-3 pt-10 pb-[calc(14px+env(safe-area-inset-bottom))]">
           {!revealed ? (
-            <button type="button" className="viewer-hint" onClick={next}>
+            <button
+              type="button"
+              className="min-h-11 justify-self-center rounded-full border-0 bg-white/18 px-5 font-bold text-white backdrop-blur-sm"
+              onClick={next}
+            >
               {reduced ? "Tap for the punchline" : "Wait for it…"}
             </button>
           ) : (
@@ -217,13 +227,14 @@ function Viewer({ joke }: { joke: Joke }) {
               {joke.isMine ? null : (
                 <ReactionBar tone="dark" selected={myReaction ?? undefined} onReact={(k) => void react(k)} />
               )}
-              <div className="viewer-reply-row">
-                <form className="viewer-reply" onSubmit={(e) => void sendReply(e)}>
-                  <label className="visually-hidden" htmlFor="reply">
+              <div className="flex gap-2">
+                <form className="flex min-h-12 flex-1 items-center rounded-full border-2 border-white/55 bg-black/12 pr-1 pl-4 text-white focus-within:border-white" onSubmit={(e) => void sendReply(e)}>
+                  <label className="sr-only" htmlFor="reply">
                     Reply to {creator.name}
                   </label>
                   <input
                     id="reply"
+                    className="min-w-0 flex-1 border-0 bg-transparent text-white outline-none placeholder:text-white/85"
                     value={reply}
                     onChange={(e) => setReply(e.target.value)}
                     onFocus={() => setTyping(true)}
@@ -231,23 +242,26 @@ function Viewer({ joke }: { joke: Joke }) {
                     placeholder={`Reply to ${creator.name.split(" ")[0]}`}
                     autoComplete="off"
                   />
-                  <button type="submit" aria-label="Send reply" disabled={!reply.trim()}>
+                  <button
+                    type="submit"
+                    className="grid size-10 place-items-center rounded-full border-0 bg-white text-ink disabled:cursor-default disabled:bg-transparent disabled:text-white/60"
+                    aria-label="Send reply"
+                    disabled={!reply.trim()}
+                  >
                     <Icon name="send" size={20} />
                   </button>
                 </form>
-                <Link to={`/joke/${joke.id}`} className="viewer-more" aria-label="Comments">
+                <Link to={`/joke/${joke.id}`} className="flex min-w-12 shrink-0 items-center justify-center gap-1.5 rounded-full bg-white px-3.5 font-bold text-ink no-underline"
+                  aria-label="Comments"
+                >
                   <Icon name="comment" size={20} />
-                  <span>Comments</span>
+                  <span className="max-sm:hidden">Comments</span>
                 </Link>
               </div>
             </>
           )}
         </div>
-        {toast ? (
-          <div className="toast viewer-toast" role="status">
-            {toast}
-          </div>
-        ) : null}
+        {toast ? <Toast placement="viewer">{toast}</Toast> : null}
       </div>
     </div>
   );

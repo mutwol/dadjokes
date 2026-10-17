@@ -7,7 +7,10 @@ import { Icon } from "../components/Icon.tsx";
 import type { IconName } from "../components/Icon.tsx";
 import { timeAgo } from "../data/dates.ts";
 import { useStore } from "../state/useStore.ts";
-import "./Activity.css";
+import { EmptyState, button, card, cn } from "../components/ui/index.ts";
+
+/** Good news (money in, a joke picked) gets a green icon. */
+const GOOD_NEWS = new Set<ActivityItem["type"]>(["joke_scheduled", "tip_received", "payout_paid"]);
 
 const ICONS: Record<ActivityItem["type"], IconName> = {
   joke_scheduled: "check",
@@ -60,40 +63,52 @@ export function Activity() {
   };
 
   return (
-    <div className="activity">
-      <header className="activity-head">
-        <h1>Activity</h1>
+    <div className="mx-auto grid max-w-feed gap-4 px-4 pb-8">
+      <header className="pt-4.5">
+        <h1 className="text-3xl">Activity</h1>
       </header>
       {items !== null && !items.length ? (
-        <div className="activity-empty">
+        <EmptyState className="justify-items-center px-5 py-10 text-center">
           <Icon name="bell" size={28} />
           <p>Nothing yet. Comments on your jokes, new subscribers and tips will show up here.</p>
-        </div>
+        </EmptyState>
       ) : (
-        <ul className="activity-list" aria-busy={items === null}>
+        <ul className="m-0 grid list-none gap-2 p-0" aria-busy={items === null}>
           {(items ?? []).map((a) => (
-            <li key={a.id} className={a.read ? "act" : "act is-new"}>
-              <Link to={a.url} className="act-link">
+            <li key={a.id}>
+              <Link
+                to={a.url}
+                className={cn(
+                  card,
+                  "flex items-start gap-3 px-3.5 py-3 text-inherit no-underline hover:border-ink-faint",
+                  !a.read && "border-tag-red shadow-[inset_4px_0_0_var(--color-tag-red)]",
+                )}
+              >
                 {a.actor ? (
                   <Avatar name={a.actor.name} tone={a.actor.tone} size={40} />
                 ) : (
-                  <span className={`act-icon act-${a.type}`}>
+                  <span
+                    className={cn(
+                      "grid size-10 shrink-0 place-items-center rounded-full",
+                      GOOD_NEWS.has(a.type) ? "bg-mint text-forest" : "bg-fridge text-ink-soft",
+                    )}
+                  >
                     <Icon name={ICONS[a.type]} size={20} />
                   </span>
                 )}
-                <span className="act-text">
-                  <span className="act-title">{a.title}</span>
-                  {a.body ? <span className="act-body">{a.body}</span> : null}
-                  <span className="act-time">{timeAgo(a.createdAt)}</span>
+                <span className="grid min-w-0 gap-0.5">
+                  <span className="font-extrabold">{a.title}</span>
+                  {a.body ? <span className="wrap-anywhere text-ink-soft">{a.body}</span> : null}
+                  <span className="text-sm text-ink-faint">{timeAgo(a.createdAt)}</span>
                 </span>
-                {a.read ? null : <span className="visually-hidden">New</span>}
+                {a.read ? null : <span className="sr-only">New</span>}
               </Link>
             </li>
           ))}
         </ul>
       )}
       {cursor ? (
-        <button type="button" className="btn btn-quiet" onClick={() => void more()}>
+        <button type="button" className={button({ variant: "quiet" })} onClick={() => void more()}>
           Show older
         </button>
       ) : null}

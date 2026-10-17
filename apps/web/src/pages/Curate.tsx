@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import type React from "react";
 import { ApiError, api, errorMessage, unwrap } from "../api/client.ts";
 import type { CurationCalendar, QueueItem, ReportedItem } from "../api/client.ts";
 import { Avatar } from "../components/Avatar.tsx";
@@ -7,7 +8,25 @@ import { StoryCard } from "../components/StoryCard.tsx";
 import { faceOf } from "../data/face.ts";
 import { longDate, shortDate, weekdayShort } from "../data/dates.ts";
 import { useStore } from "../state/useStore.ts";
-import "./Curate.css";
+import { Card, EmptyState, Pill, button, cn, errorText, field, segment, segmented } from "../components/ui/index.ts";
+
+const muted = "text-sm text-ink-soft";
+const list = "m-0 grid list-none gap-3.5 p-0";
+const small = button({ size: "sm" });
+const smallQuiet = button({ variant: "quiet", size: "sm" });
+
+/** A compact labelled control in a card's action row. */
+function CardField({ label, grow, children }: { label: string; grow?: boolean; children: React.ReactNode }) {
+  return (
+    <label className={cn("grid gap-1 text-sm font-bold", grow && "flex-[1_1_200px]")}>
+      <span>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+/** The row of form controls and buttons at the bottom of a queue card. */
+const actionRow = "flex flex-wrap items-end gap-2.5 border-t border-line pt-3";
 
 const DECLINE_REASONS: { value: QueueItem["joke"]["declineReason"] & string; label: string }[] = [
   { value: "possible_copy", label: "Looks copied" },
@@ -27,17 +46,17 @@ function firstFreeDay(days: Calendar, region: string | null): string | undefined
 export function Curate() {
   const [tab, setTab] = useState<"queue" | "reports">("queue");
   return (
-    <div className="curate">
-      <header className="curate-head">
-        <h1>Curation</h1>
-        <div className="segmented curate-tabs" role="tablist" aria-label="Curation">
+    <div className="mx-auto grid max-w-content gap-5 px-4 pb-8">
+      <header className="grid gap-1 pt-4.5">
+        <h1 className="text-3xl">Curation</h1>
+        <div className={cn(segmented, "mt-1.5 justify-self-start")} role="tablist" aria-label="Curation">
           {(["queue", "reports"] as const).map((t) => (
             <button
               key={t}
               type="button"
               role="tab"
               aria-selected={tab === t}
-              className={`segmented-opt${tab === t ? " is-on" : ""}`}
+              className={segment(tab === t, "px-4.5")}
               onClick={() => setTab(t)}
             >
               {t === "queue" ? "Review queue" : "Reports"}
@@ -84,43 +103,43 @@ function Reports() {
 
   if (items !== null && !items.length) {
     return (
-      <div className="curate-empty">
+      <EmptyState>
         <p>No open reports. Everyone's behaving, or at least groaning politely.</p>
-      </div>
+      </EmptyState>
     );
   }
   return (
-    <ul className="curate-list" aria-busy={items === null}>
+    <ul className={list} aria-busy={items === null}>
       {(items ?? []).map((item) => (
-        <li key={`${item.jokeId}-${item.commentId ?? ""}`} className="qcard">
-          <p className="qcard-muted">
+        <Card as="li" key={`${item.jokeId}-${item.commentId ?? ""}`} className="grid gap-3 p-3.5">
+          <p className={muted}>
             {item.target === "joke" ? "Joke" : "Comment"} by @{item.authorHandle} · {item.reports}{" "}
             {item.reports === 1 ? "report" : "reports"} since {shortDate(item.firstReportedAt.slice(0, 10))}
           </p>
-          <p className="qcard-setup">“{item.preview}”</p>
-          <div className="report-reasons">
+          <p className="font-extrabold">“{item.preview}”</p>
+          <div className="flex flex-wrap gap-1.5">
             {Object.entries(item.reasons).map(([reason, n]) => (
-              <span key={reason} className="report-reason">
+              <Pill key={reason} tone="muted" className="py-0.75">
                 {REASON_LABEL[reason] ?? reason} × {n}
-              </span>
+              </Pill>
             ))}
           </div>
           {item.notes.length ? (
-            <ul className="report-notes">
+            <ul className="m-0 pl-4.5 text-sm text-ink-soft">
               {item.notes.map((n, i) => (
                 <li key={i}>{n}</li>
               ))}
             </ul>
           ) : null}
-          <div className="qcard-buttons">
-            <button type="button" className="btn btn-primary btn-small" onClick={() => void resolve(item, "remove")}>
+          <div className="flex gap-2">
+            <button type="button" className={small} onClick={() => void resolve(item, "remove")}>
               Take it down
             </button>
-            <button type="button" className="btn btn-quiet btn-small" onClick={() => void resolve(item, "dismiss")}>
+            <button type="button" className={smallQuiet} onClick={() => void resolve(item, "dismiss")}>
               Leave it up
             </button>
           </div>
-        </li>
+        </Card>
       ))}
     </ul>
   );
@@ -181,28 +200,28 @@ function Queue() {
 
   return (
     <>
-      <p className="curate-count">
+      <p className={muted}>
         {items === null ? "Loading the queue…" : `${waiting} ${waiting === 1 ? "joke" : "jokes"} waiting for review`}
       </p>
 
       {calendar ? <CalendarStrip calendar={calendar} /> : null}
 
       {items !== null && !items.length ? (
-        <div className="curate-empty">
+        <EmptyState>
           <p>The queue is empty. Nothing to groan at for now.</p>
-          <button type="button" className="btn btn-quiet btn-small" onClick={() => setVersion((v) => v + 1)}>
+          <button type="button" className={smallQuiet} onClick={() => setVersion((v) => v + 1)}>
             Check again
           </button>
-        </div>
+        </EmptyState>
       ) : (
-        <ul className="curate-list" aria-busy={items === null}>
+        <ul className={list} aria-busy={items === null}>
           {(items ?? []).map((item) => (
             <QueueCard key={item.joke.id} item={item} calendar={calendar} onDone={done} />
           ))}
         </ul>
       )}
       {nextCursor ? (
-        <button type="button" className="btn btn-quiet" onClick={() => void loadMore()}>
+        <button type="button" className={button({ variant: "quiet" })} onClick={() => void loadMore()}>
           Show more
         </button>
       ) : null}
@@ -213,28 +232,33 @@ function Queue() {
 function CalendarStrip({ calendar }: { calendar: CurationCalendar }) {
   const empty = calendar.days.filter((d) => !d.picks.some((p) => p.region === null)).length;
   return (
-    <section className="cal" aria-labelledby="cal-title">
-      <div className="cal-head">
-        <h2 id="cal-title">Coming up</h2>
-        <p>{empty ? `${empty} of the next ${calendar.days.length} days have no joke yet` : "Every day is covered"}</p>
+    <section className="grid gap-2.5" aria-labelledby="cal-title">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h2 id="cal-title" className="text-xl">
+          Coming up
+        </h2>
+        <p className={muted}>{empty ? `${empty} of the next ${calendar.days.length} days have no joke yet` : "Every day is covered"}</p>
       </div>
-      <ol className="cal-days">
+      <ol className="m-0 flex list-none gap-1.5 overflow-x-auto p-0 pb-1.5">
         {calendar.days.map((d) => {
           const everywhere = d.picks.find((p) => p.region === null);
           const regional = d.picks.filter((p) => p.region !== null);
           return (
             <li
               key={d.date}
-              className={`cal-day${everywhere ? " is-filled" : ""}`}
+              className={cn(
+                "relative grid flex-[0_0_46px] justify-items-center gap-0.5 rounded-xl border-[1.5px] py-2",
+                everywhere ? "border-solid border-denim bg-sky" : "border-dashed border-line bg-paper",
+              )}
               title={d.picks.map((p) => `${p.region ?? "Everywhere"}: ${p.setup ?? ""} (${p.creatorName})`).join("\n")}
             >
-              <span className="cal-dow">{weekdayShort(d.date)}</span>
-              <span className="cal-num">{Number(d.date.slice(8))}</span>
-              <span className="visually-hidden">
+              <span className="text-2xs font-bold text-ink-soft">{weekdayShort(d.date)}</span>
+              <span className="font-extrabold">{Number(d.date.slice(8))}</span>
+              <span className="sr-only">
                 {everywhere ? "has a joke" : "no joke yet"}
                 {regional.length ? `, plus ${regional.map((r) => r.region).join(", ")}` : ""}
               </span>
-              {regional.length ? <span className="cal-regional" aria-hidden="true">+{regional.length}</span> : null}
+              {regional.length ? <span className="absolute -top-1.75 -right-1.25 rounded-full bg-tag-red px-1.25 py-px text-[0.65rem] font-extrabold text-white" aria-hidden="true">+{regional.length}</span> : null}
             </li>
           );
         })}
@@ -301,25 +325,21 @@ function QueueCard({
 
   const title = joke.setup ?? joke.caption ?? "Image joke";
   return (
-    <li className="qcard" aria-label={title}>
-      <div className="qcard-joke">
-        <div className="qcard-thumb">
-          <StoryCard
-            face={faceOf(joke)}
-            revealed
-            animate={false}
-          />
+    <Card as="li" className="grid gap-3 p-3.5" aria-label={title}>
+      <div className="flex gap-3.5">
+        <div className="w-21 shrink-0">
+          <StoryCard face={faceOf(joke)} revealed animate={false} variant="thumb" />
         </div>
-        <div className="qcard-text">
-          <p className="qcard-setup">{joke.setup ?? joke.caption}</p>
-          {joke.punchline ? <p className="qcard-punch">{joke.punchline}</p> : null}
-          <div className="qcard-by">
+        <div className="grid min-w-0 content-start gap-1.5">
+          <p className="font-extrabold">{joke.setup ?? joke.caption}</p>
+          {joke.punchline ? <p className="font-semibold">{joke.punchline}</p> : null}
+          <div className="flex items-center gap-2 text-sm font-bold">
             <Avatar name={joke.creator.name} tone={joke.creator.tone} size={28} />
             <span>
-              {joke.creator.name} <span className="qcard-muted">@{joke.creator.handle}</span>
+              {joke.creator.name} <span className={muted}>@{joke.creator.handle}</span>
             </span>
           </div>
-          <p className="qcard-muted">
+          <p className={muted}>
             For {joke.region ?? "everywhere"}
             {joke.topics.length ? ` · ${joke.topics.join(", ")}` : ""} · sent {shortDate(joke.submittedAt.slice(0, 10))}
           </p>
@@ -327,13 +347,13 @@ function QueueCard({
       </div>
 
       {possibleCopies.length ? (
-        <div className="qcard-copies" role="note">
-          <p className="qcard-copies-title">Possible copies</p>
-          <ul>
+        <div className="grid gap-1.5 rounded-xl bg-butter px-3 py-2.5 text-sm text-butter-ink-deep" role="note">
+          <p className="font-extrabold">Possible copies</p>
+          <ul className="m-0 grid gap-1 pl-4.5">
             {possibleCopies.map((c) => (
               <li key={c.id}>
                 <strong>{Math.round(c.similarity * 100)}% alike:</strong> “{c.setup}” {c.punchline ? `“${c.punchline}”` : ""}{" "}
-                <span className="qcard-muted">
+                <span className="text-butter-ink">
                   {c.sameWriter ? "by the same writer" : `by @${c.creatorHandle}`}, {c.status.replace("_", " ")}
                   {c.deliverOn ? ` ${shortDate(c.deliverOn)}` : ""}
                 </span>
@@ -344,57 +364,61 @@ function QueueCard({
       ) : null}
 
       {declining ? (
-        <form className="qcard-actions" onSubmit={(e) => void decline(e)}>
-          <label className="qcard-field">
-            <span>Reason</span>
-            <select value={reason} onChange={(e) => setReason(e.target.value)}>
+        <form className={actionRow} onSubmit={(e) => void decline(e)}>
+          <CardField label="Reason">
+            <select className={field("sm")} value={reason} onChange={(e) => setReason(e.target.value)}>
               {DECLINE_REASONS.map((r) => (
                 <option key={r.value} value={r.value}>
                   {r.label}
                 </option>
               ))}
             </select>
-          </label>
-          <label className="qcard-field qcard-grow">
-            <span>Note for the writer (optional)</span>
-            <input value={note} maxLength={280} onChange={(e) => setNote(e.target.value)} autoComplete="off" />
-          </label>
-          <div className="qcard-buttons">
-            <button type="submit" className="btn btn-primary btn-small" disabled={busy}>
+          </CardField>
+          <CardField label="Note for the writer (optional)" grow>
+            <input
+              className={field("sm")}
+              value={note}
+              maxLength={280}
+              onChange={(e) => setNote(e.target.value)}
+              autoComplete="off"
+            />
+          </CardField>
+          <div className="flex gap-2">
+            <button type="submit" className={small} disabled={busy}>
               Decline
             </button>
-            <button type="button" className="btn btn-quiet btn-small" onClick={() => setDeclining(false)}>
+            <button type="button" className={smallQuiet} onClick={() => setDeclining(false)}>
               Schedule instead
             </button>
           </div>
         </form>
       ) : (
-        <form className="qcard-actions" onSubmit={(e) => void schedule(e)}>
-          <label className="qcard-field">
-            <span>Goes out on</span>
+        <form className={actionRow} onSubmit={(e) => void schedule(e)}>
+          <CardField label="Goes out on">
             <input
+              className={field("sm")}
               type="date"
               value={chosenDay}
               min={calendar?.firstOpenDay}
               onChange={(e) => setDay(e.target.value)}
               required
             />
-          </label>
-          <div className="qcard-buttons">
-            <button type="submit" className="btn btn-primary btn-small" disabled={busy || !chosenDay}>
+          </CardField>
+          <div className="flex gap-2">
+            <button type="submit" className={small} disabled={busy || !chosenDay}>
               Schedule
             </button>
-            <button type="button" className="btn btn-quiet btn-small" onClick={() => setDeclining(true)}>
+            <button type="button" className={smallQuiet} onClick={() => setDeclining(true)}>
               Decline…
             </button>
           </div>
         </form>
       )}
       {error ? (
-        <p className="qcard-error" role="alert">
+        <p className={errorText} role="alert">
           {error}
         </p>
       ) : null}
-    </li>
+    </Card>
   );
 }

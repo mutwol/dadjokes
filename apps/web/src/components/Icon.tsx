@@ -24,10 +24,12 @@ export function Icon({
   name,
   size = 24,
   label,
+  className,
 }: {
   name: IconName;
   size?: number;
   label?: string;
+  className?: string;
 }) {
   return (
     <svg
@@ -42,6 +44,7 @@ export function Icon({
       role={label ? "img" : undefined}
       aria-label={label}
       aria-hidden={label ? undefined : true}
+      className={className}
     >
       <path d={PATHS[name]} />
     </svg>

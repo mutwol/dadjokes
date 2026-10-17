@@ -1,24 +1,195 @@
 @import "tailwindcss";
 
 /*
- * Expose the design tokens (src/styles/tokens.css) to Tailwind, so utilities like
- * `bg-tag-red`, `text-ink-soft` or `font-marker` use the same values as the
- * component CSS. Component styles are plain CSS for now; new UI can use either.
+ * Daddy Jokes design tokens.
+ *
+ * Every colour, size, radius and shadow the UI uses is defined here and nowhere else.
+ * Tailwind turns each token into utilities: `--color-ink` gives `text-ink`, `bg-ink`,
+ * `border-ink`; `--radius-2xl` gives `rounded-2xl`; and so on. The default Tailwind
+ * palette, type scale, radii and breakpoints are cleared first, so only these exist and
+ * a stray `bg-blue-500` or `md:` fails to style anything instead of drifting off-brand.
+ *
+ * Palette: fridge-door white, polo navy, name-tag red, highlighter yellow, lawn green
+ * and denim. Punchlines and name tags are "written" in marker; everything else is set
+ * in Atkinson Hyperlegible Next.
  */
-@theme inline {
-  --color-fridge: var(--fridge);
-  --color-paper: var(--paper);
-  --color-ink: var(--ink);
-  --color-ink-soft: var(--ink-soft);
-  --color-ink-faint: var(--ink-faint);
-  --color-line: var(--line);
-  --color-line-strong: var(--line-strong);
-  --color-tag-red: var(--tag-red);
-  --color-highlighter: var(--highlighter);
-  --color-lawn: var(--lawn);
-  --color-denim: var(--denim);
-  --color-navy: var(--navy);
+@theme {
+  /* Colours */
+  --color-*: initial;
+  --color-white: #ffffff;
+  --color-black: #000000;
 
-  --font-sans: var(--font-ui);
-  --font-marker: var(--font-hand);
+  --color-fridge: #f3f6f9; /* page background */
+  --color-paper: #ffffff; /* cards, inputs */
+  --color-ink: #1c2340; /* text, selected state */
+  --color-ink-soft: #4b5373; /* secondary text */
+  --color-ink-faint: #8a90a8; /* tertiary text, inactive tabs */
+  --color-line: #dde3ec; /* hairlines, card borders */
+  --color-line-strong: #c7cfdc; /* input borders, disabled buttons */
+
+  --color-tag-red: #e23b3b; /* primary action, brand */
+  --color-tag-red-deep: #b82a2d; /* primary hover, error text */
+  --color-highlighter: #ffd43b;
+  --color-lawn: #2e9e58;
+  --color-denim: #3e5c9a;
+  --color-denim-deep: #2f4880;
+  --color-navy: #1c2340;
+
+  /* Tints for selected cards and status pills */
+  --color-cream: #fff8d6; /* selected option, "your own joke" box */
+  --color-cream-edge: #f2dc7a;
+  --color-butter: #fff1b8; /* in review, possible copies */
+  --color-butter-ink: #6b5200;
+  --color-butter-ink-deep: #4d3b00;
+  --color-sky: #dde7fb; /* scheduled */
+  --color-mint: #d8f1e1; /* delivered, money in */
+  --color-forest: #1d6b3b; /* success text */
+
+  /* Type */
+  --font-sans: "Atkinson Hyperlegible Next Variable", system-ui, sans-serif;
+  --font-marker: "Permanent Marker", "Comic Sans MS", cursive;
+
+  /*
+   * Major-third scale on a 16px base. No line heights are attached, so text keeps the
+   * line height of its context (1.5 for body copy, 1.15 for headings).
+   */
+  --text-*: initial;
+  --text-2xs: 0.6875rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5625rem;
+  --text-3xl: 1.953rem;
+  --text-4xl: 2.441rem;
+
+  /* Radii: 2xl for cards and inputs, 3xl for big panels and story cards. */
+  --radius-*: initial;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.625rem;
+  --radius-2xl: 0.875rem;
+  --radius-3xl: 1.375rem;
+
+  /* Breakpoints: xs only for squeezing phones, sm for large phones, lg for the desktop layout. */
+  --breakpoint-*: initial;
+  --breakpoint-xs: 25rem;
+  --breakpoint-sm: 37.5rem;
+  --breakpoint-lg: 56.25rem;
+
+  /* Page widths */
+  --container-onboarding: 30rem;
+  --container-form: 32.5rem;
+  --container-narrow: 40rem;
+  --container-feed: 45rem;
+  --container-content: 51.25rem;
+  --container-wide: 67.5rem;
+
+  /* Height of the phone tab bar; content and sticky footers clear it. */
+  --spacing-nav: 4rem;
+
+  --shadow-focus: 0 0 0 3px var(--color-paper), 0 0 0 5px var(--color-denim);
+  --shadow-tag: 0 1px 0 rgb(28 35 64 / 0.25), 0 6px 14px -8px rgb(28 35 64 / 0.5);
+  --shadow-fab: 0 6px 14px -6px rgb(226 59 59 / 0.7);
+  --shadow-lift: 0 30px 60px -30px rgb(0 0 0 / 0.5);
+  --shadow-frame: 0 30px 80px -30px rgb(0 0 0 / 0.6);
+  --shadow-knob: 0 1px 3px rgb(0 0 0 / 0.25);
+
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --animate-toast-in: toast-in 220ms var(--ease-out);
+  --animate-viewer-in: viewer-in 240ms var(--ease-out);
+  --animate-shimmer: shimmer 1.4s linear infinite;
+  --animate-burst: burst 420ms var(--ease-out);
+  --animate-highlighter: highlighter 520ms var(--ease-out) both;
+  --animate-punch-in: punch-in 380ms 160ms var(--ease-out) both;
+  --animate-progress: progress linear forwards;
+
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      translate: 0 8px;
+    }
+  }
+  @keyframes viewer-in {
+    from {
+      opacity: 0;
+      scale: 0.98;
+    }
+  }
+  @keyframes shimmer {
+    to {
+      background-position: -150% 0;
+    }
+  }
+  @keyframes burst {
+    40% {
+      transform: scale(1.45) rotate(-10deg);
+    }
+  }
+  /* The highlighter: a background that wipes in from the left. */
+  @keyframes highlighter {
+    from {
+      background-size: 0% 88%;
+      color: transparent;
+    }
+    60% {
+      color: transparent;
+    }
+  }
+  @keyframes punch-in {
+    from {
+      rotate: -8deg;
+      scale: 0.9;
+    }
+  }
+  @keyframes progress {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-fridge text-ink antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    line-height: 1.15;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: none;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-focus);
+  }
+
+  /* Option cards hide their native input with sr-only; keep it inside the card. */
+  label:has(> .sr-only) {
+    position: relative;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 1ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 1ms !important;
+    }
+  }
 }

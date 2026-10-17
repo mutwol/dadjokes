@@ -3,6 +3,10 @@ import type { ReactNode } from "react";
 import { Link, Navigate } from "react-router";
 import { useStore } from "../state/useStore.ts";
 import { NameTag } from "./NameTag.tsx";
+import { Button, button } from "./ui/index.ts";
+
+/** The page for someone who can't see a screen yet, with a way forward. */
+const gate = "mx-auto grid max-w-form justify-items-start gap-4 px-4 py-14";
 
 /**
  * Lets signed-in, onboarded people through. Waits while the session is being
@@ -11,7 +15,7 @@ import { NameTag } from "./NameTag.tsx";
  */
 export function RequireProfile({ children }: { children: ReactNode }) {
   const { status, account } = useStore();
-  if (status === "loading") return <div className="boot" aria-busy="true" />;
+  if (status === "loading") return <div className="min-h-dvh" aria-busy="true" />;
   if (!account) return <Navigate to="/welcome" replace />;
   if (!account.onboarded) return <Navigate to="/welcome/role" replace />;
   return children;
@@ -26,16 +30,14 @@ export function RequireWriter({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false);
   if (hasRole("writer")) return children;
   return (
-    <div className="gate">
+    <div className={gate}>
       <NameTag name={account?.name?.split(" ")[0] ?? "You"} size="m" tilt={-4} />
-      <h1>Write jokes too?</h1>
-      <p>
+      <h1 className="text-3xl">Write jokes too?</h1>
+      <p className="text-ink-soft">
         Submit your own dad jokes. If curators pick one, every reader gets it that day and you see the
         views, reactions and tips. You'll keep getting your daily joke.
       </p>
-      <button
-        type="button"
-        className="btn btn-primary"
+      <Button
         disabled={busy}
         onClick={() => {
           setBusy(true);
@@ -46,8 +48,8 @@ export function RequireWriter({ children }: { children: ReactNode }) {
         }}
       >
         {busy ? "Turning on…" : "Start writing"}
-      </button>
-      <p className="gate-note">You can turn this off in your profile.</p>
+      </Button>
+      <p className="text-sm text-ink-soft">You can turn this off in your profile.</p>
     </div>
   );
 }
@@ -57,10 +59,10 @@ export function RequireCurator({ children }: { children: ReactNode }) {
   const { hasRole } = useStore();
   if (hasRole("curator") || hasRole("admin")) return children;
   return (
-    <div className="gate">
-      <h1>Curators only</h1>
-      <p>This is where the daily joke gets picked. Ask an admin if you should have access.</p>
-      <Link to="/" className="btn btn-quiet">
+    <div className={gate}>
+      <h1 className="text-3xl">Curators only</h1>
+      <p className="text-ink-soft">This is where the daily joke gets picked. Ask an admin if you should have access.</p>
+      <Link to="/" className={button({ variant: "quiet" })}>
         Back to today
       </Link>
     </div>

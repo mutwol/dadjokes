@@ -11,7 +11,26 @@ import { compact } from "../data/reactions.ts";
 
 import { longDate, shortDate } from "../data/dates.ts";
 import { useStore } from "../state/useStore.ts";
-import "./Studio.css";
+import { Card, EmptyState, Pill, button, card, cn, field } from "../components/ui/index.ts";
+
+const STATUS_TONE = {
+  in_review: "review",
+  scheduled: "scheduled",
+  delivered: "delivered",
+  declined: "muted",
+  withdrawn: "muted",
+} as const satisfies Record<Submission["status"], string>;
+
+const meta = "text-sm text-ink-soft";
+
+function Stat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="bg-paper p-4">
+      <dt className="text-sm font-bold text-ink-soft">{label}</dt>
+      <dd className="mt-1 text-2xl font-extrabold">{value}</dd>
+    </div>
+  );
+}
 
 const STATUS: Record<Submission["status"], string> = {
   in_review: "In review",
@@ -112,32 +131,24 @@ export function Studio() {
   const list = jokes ?? [];
 
   return (
-    <div className="studio">
-      <header className="studio-head">
-        <h1>Studio</h1>
-        <Link to="/create" className="btn btn-primary">
+    <div className="mx-auto grid max-w-content gap-6 px-4 lg:px-8 lg:pt-7">
+      <header className="flex items-center justify-between gap-3 pt-4.5 lg:pt-0">
+        <h1 className="text-3xl">Studio</h1>
+        <Link to="/create" className={button()}>
           <Icon name="plus" size={20} />
           Write a joke
         </Link>
       </header>
 
-      <dl className="studio-stats" aria-busy={summary === null}>
-        <div>
-          <dt>People reached</dt>
-          <dd>{summary ? compact(summary.reached) : "–"}</dd>
-        </div>
-        <div>
-          <dt>Jokes picked</dt>
-          <dd>{summary ? summary.picked : "–"}</dd>
-        </div>
-        <div>
-          <dt>Waiting for review</dt>
-          <dd>{summary ? summary.inReview : "–"}</dd>
-        </div>
-        <div>
-          <dt>Tips received</dt>
-          <dd>{balance ? `KES ${compact(balance.lifetimeTipsKes)}` : "–"}</dd>
-        </div>
+      {/* A grid of cells separated by 1px gaps that show the line colour behind them. */}
+      <dl
+        className={cn(card, "m-0 grid grid-cols-2 gap-px overflow-hidden bg-line sm:grid-cols-4")}
+        aria-busy={summary === null}
+      >
+        <Stat label="People reached" value={summary ? compact(summary.reached) : "–"} />
+        <Stat label="Jokes picked" value={summary ? summary.picked : "–"} />
+        <Stat label="Waiting for review" value={summary ? summary.inReview : "–"} />
+        <Stat label="Tips received" value={balance ? `KES ${compact(balance.lifetimeTipsKes)}` : "–"} />
       </dl>
 
       {balance ? (
@@ -155,57 +166,61 @@ export function Studio() {
         <DailyChart title="Opens, last 14 days" unit="opens" days={daily.map((d) => ({ date: d.date, value: d.opens }))} />
       ) : null}
 
-      <section aria-labelledby="subs-title" className="studio-list">
-        <h2 id="subs-title">Your jokes</h2>
+      <section aria-labelledby="subs-title" className="grid gap-3">
+        <h2 id="subs-title" className="text-xl">Your jokes</h2>
         {failed ? (
-          <div className="studio-empty" role="alert">
+          <EmptyState role="alert">
             <p>Couldn't load your jokes.</p>
-            <button type="button" className="btn btn-quiet btn-small" onClick={() => setAttempt((a) => a + 1)}>
+            <button
+              type="button"
+              className={button({ variant: "quiet", size: "sm" })}
+              onClick={() => setAttempt((a) => a + 1)}
+            >
               Try again
             </button>
-          </div>
+          </EmptyState>
         ) : jokes !== null && !list.length ? (
-          <div className="studio-empty">
+          <EmptyState>
             <p>You haven't sent a joke yet. Curators pick one a day, so make it groan-worthy.</p>
-          </div>
+          </EmptyState>
         ) : (
-          <ul aria-busy={jokes === null}>
+          <ul className="m-0 grid list-none gap-2.5 p-0" aria-busy={jokes === null}>
             {list.map((s) => (
-              <li key={s.id} className="sub">
-                <div className="sub-thumb">
-                  <StoryCard
-                    face={faceOf(s)}
-                    revealed
-                    animate={false}
-                  />
+              <Card as="li" key={s.id} className="flex items-center gap-3.5 p-3">
+                <div className="w-16 shrink-0">
+                  <StoryCard face={faceOf(s)} revealed animate={false} variant="thumb" />
                 </div>
-                <div className="sub-body">
-                  <span className={`status status-${s.status.replace("_", "-")}`}>{STATUS[s.status]}</span>
-                  <p className="sub-setup">
+                <div className="grid min-w-0 flex-1 justify-items-start gap-1">
+                  <Pill tone={STATUS_TONE[s.status]}>{STATUS[s.status]}</Pill>
+                  <p className="font-bold">
                     {s.status === "delivered" && !s.removed ? (
                       <Link to={`/joke/${s.id}`}>{s.setup ?? s.caption ?? "Image joke"}</Link>
                     ) : (
                       (s.setup ?? s.caption ?? "Image joke")
                     )}
                   </p>
-                  <p className="sub-meta">{describe(s)}</p>
+                  <p className={meta}>{describe(s)}</p>
                 </div>
                 {s.canWithdraw ? (
                   <button
                     type="button"
-                    className="btn btn-quiet btn-small sub-action"
+                    className={button({ variant: "quiet", size: "sm", className: "shrink-0" })}
                     onClick={() => void withdraw(s)}
                     aria-label={`Withdraw "${s.setup ?? s.caption ?? "image joke"}"`}
                   >
                     Withdraw
                   </button>
                 ) : null}
-              </li>
+              </Card>
             ))}
           </ul>
         )}
         {nextCursor ? (
-          <button type="button" className="btn btn-quiet" onClick={() => void loadMore(nextCursor)}>
+          <button
+            type="button"
+            className={button({ variant: "quiet" })}
+            onClick={() => void loadMore(nextCursor)}
+          >
             Show more
           </button>
         ) : null}
@@ -253,25 +268,28 @@ function TipsPanel({
   };
 
   return (
-    <section className="tips-panel" aria-labelledby="tips-title">
-      <div className="tips-head">
+    <Card as="section" className="grid gap-3 p-4" aria-labelledby="tips-title">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 id="tips-title">Your tips</h2>
-          <p className="tips-balance">
-            <strong>KES {balance.availableKes.toLocaleString("en-KE")}</strong> ready to withdraw
+          <h2 id="tips-title" className="text-xl">
+            Your tips
+          </h2>
+          <p>
+            <strong className="text-2xl">KES {balance.availableKes.toLocaleString("en-KE")}</strong> ready to withdraw
           </p>
         </div>
-        {balance.pendingPayoutKes ? <p className="sub-meta">KES {balance.pendingPayoutKes} on its way</p> : null}
+        {balance.pendingPayoutKes ? <p className={meta}>KES {balance.pendingPayoutKes} on its way</p> : null}
       </div>
       {balance.payoutPhoneLast3 === null ? (
-        <p className="sub-meta">
+        <p className={meta}>
           Add your M-Pesa number in your <Link to="/me">profile</Link> to withdraw tips.
         </p>
       ) : canWithdraw ? (
-        <form className="tips-form" onSubmit={(e) => void withdraw(e)}>
+        <form className="flex flex-wrap items-center gap-2.5" onSubmit={(e) => void withdraw(e)}>
           <label>
-            <span className="visually-hidden">Amount in KES</span>
+            <span className="sr-only">Amount in KES</span>
             <input
+              className={field("sm", "w-[130px] font-bold")}
               type="number"
               inputMode="numeric"
               min={balance.minimumPayoutKes}
@@ -283,26 +301,26 @@ function TipsPanel({
               required
             />
           </label>
-          <button type="submit" className="btn btn-primary btn-small" disabled={busy || !amount}>
+          <button type="submit" className={button({ size: "sm" })} disabled={busy || !amount}>
             Withdraw to M-Pesa ending {balance.payoutPhoneLast3}
           </button>
         </form>
       ) : (
-        <p className="sub-meta">You can withdraw once you have KES {balance.minimumPayoutKes}.</p>
+        <p className={meta}>You can withdraw once you have KES {balance.minimumPayoutKes}.</p>
       )}
       {transfers.length ? (
-        <ul className="tips-transfers">
+        <ul className="m-0 grid list-none gap-1.5 p-0">
           {transfers.slice(0, 5).map((t) => (
-            <li key={t.id}>
+            <li key={t.id} className="flex justify-between gap-3 font-bold">
               <span>KES {t.amountKes}</span>
-              <span className="sub-meta">
+              <span className={meta}>
                 {TRANSFER_STATUS[t.status]} · {shortDate(t.createdAt.slice(0, 10))}
               </span>
             </li>
           ))}
         </ul>
       ) : null}
-    </section>
+    </Card>
   );
 }
 

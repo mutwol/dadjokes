@@ -41,7 +41,7 @@ another email. In development the sign-in code is also printed in the API's log.
 
 - `src/api/client.ts` is the API client (typed from `@daddy-jokes/contracts`), with the
   in-memory access token and single-flight refresh.
-- `src/data/` holds types and the remaining mock data (`mock.ts`).
+- `src/data/` holds types, date helpers and the sample joke shown on the welcome screen.
 - `src/state/` is the store: the signed-in account from the API, plus in-memory mock state
   (reactions, comments, seen days, submissions).
 - `src/pages/onboarding/` holds the sign-up flow. `flow.ts` decides the step order from the roles
@@ -49,9 +49,30 @@ another email. In development the sign-in code is also printed in the API's log.
 - `src/components/` holds shared pieces: `StoryCard` (the joke face used everywhere), `NameTag`
   (the "Hello, my name is" sticker used as logo and byline), `Reactions` (reaction bar and groan
   meter) and `AppShell` (bottom tab bar on mobile, left rail on desktop).
-- `src/styles/tokens.css` defines the palette, type and radii. `src/index.css` exposes the
-  colours to Tailwind (`bg-tag-red`, `text-ink-soft`, `font-marker` and so on), so new UI can use
-  utilities while the existing screens use plain CSS next to each component.
+- `src/components/ui/` holds the building blocks every screen uses (see Styling below).
+
+## Styling
+
+Everything is styled with Tailwind v4 utility classes in the components themselves. There are no
+per-screen CSS files; the only stylesheet is `src/index.css`.
+
+- **Tokens** live in the `@theme` block of `src/index.css`: colours (`bg-tag-red`, `text-ink-soft`,
+  `bg-cream`), the type scale (`text-sm` to `text-4xl`), radii (`rounded-2xl` for cards and inputs,
+  `rounded-3xl` for big panels and story cards), breakpoints (`xs` 400px, `sm` 600px, `lg` 900px for
+  the desktop layout), page widths (`max-w-wide`, `max-w-content`, …), shadows and animations.
+  Tailwind's default palette, type scale, radii and breakpoints are switched off, so only these
+  exist. To change a colour or size everywhere, change it there.
+- **Components** in `src/components/ui/`: `Button`, `IconButton`, `TextButton`, `Card`,
+  `EmptyState`, `Chip`, `Switch`, `Pill`, `CountBadge`, `Toast`, `Input`, `Textarea`, `Select` and
+  `CheckRow`. Import them from `components/ui/index.ts`.
+- **Recipes** in `src/components/ui/recipes.ts` are the same looks as plain class strings, for
+  elements that aren't those components: `<Link className={button({ variant: "quiet" })}>`,
+  `<section className={cn(card, "p-4")}>`, `choice(selected)` for selectable tiles,
+  `segment(selected)` for segmented controls, `field("lg")` for inputs.
+- **`cn()`** joins classes and resolves conflicts (via tailwind-merge), so a caller's class wins:
+  `button({ className: "w-full" })`. Put a font size before a line height in the same `cn()`
+  call, or the line height is dropped.
+- `TONE` maps a joke background (`red`, `navy`, …) to its background and text colours.
 
 ## Design direction
 

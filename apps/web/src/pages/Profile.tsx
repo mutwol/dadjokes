@@ -1,3 +1,4 @@
+import type React from "react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { api } from "../api/client.ts";
@@ -8,7 +9,32 @@ import { NameTag } from "../components/NameTag.tsx";
 import { formatHour } from "../components/useCountdown.ts";
 import type { Role } from "../data/types.ts";
 import { useStore } from "../state/useStore.ts";
-import "./Profile.css";
+import { Switch, button, card, cn, field } from "../components/ui/index.ts";
+
+/** A titled block of the profile page. */
+function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
+  return (
+    <section className="grid justify-items-start gap-3" aria-labelledby={id}>
+      <h2 id={id} className="text-xl">
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+/** A card of label/value rows separated by hairlines. */
+const rows = cn(card, "m-0 w-full list-none divide-y divide-line p-0");
+const row = "flex items-center justify-between gap-4 px-4 py-3.5";
+
+function Setting({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className={row}>
+      <dt className="font-bold">{label}</dt>
+      <dd className="m-0 min-w-0 text-right text-ink-soft">{children}</dd>
+    </div>
+  );
+}
 
 const ROLE_COPY: Record<Role, { title: string; on: string; off: string }> = {
   reader: {
@@ -100,62 +126,52 @@ export function Profile() {
   };
 
   return (
-    <div className="profile">
-      <header className="profile-head">
+    <div className="mx-auto grid max-w-narrow gap-7 px-4 pt-6 lg:pt-10">
+      <header className="flex items-center gap-4">
         <Avatar name={name} tone={account.tone} size={72} />
-        <div className="profile-id">
-          <h1>{name}</h1>
-          <p>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl">{name}</h1>
+          <p className="text-sm text-ink-soft">
             @{account.handle}
             {account.country ? `, ${account.country}` : ""}
           </p>
-          {account.bio ? <p className="profile-bio">{account.bio}</p> : null}
+          {account.bio ? <p className="mt-1 text-sm">{account.bio}</p> : null}
         </div>
-        <NameTag name={name.split(" ")[0]} size="s" tilt={4} />
+        <NameTag name={name.split(" ")[0]} size="s" tilt={4} className="hidden sm:inline-flex" />
       </header>
 
-      <section className="profile-section" aria-labelledby="roles-title">
-        <h2 id="roles-title">How you use Daddy Jokes</h2>
-        <ul className="role-switches">
+      <Section id="roles-title" title="How you use Daddy Jokes">
+        <ul className={rows}>
           {(["reader", "writer"] as const).map((r) => {
             const on = hasRole(r);
             return (
-              <li key={r}>
+              <li key={r} className={row}>
                 <div>
-                  <p className="switch-title" id={`role-${r}`}>
+                  <p className="font-extrabold" id={`role-${r}`}>
                     {ROLE_COPY[r].title}
                   </p>
-                  <p className="switch-sub">{on ? ROLE_COPY[r].on : ROLE_COPY[r].off}</p>
+                  <p className="text-sm text-ink-soft">{on ? ROLE_COPY[r].on : ROLE_COPY[r].off}</p>
                 </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={on}
+                <Switch
+                  checked={on}
                   aria-labelledby={`role-${r}`}
                   aria-busy={busyRole === r}
                   disabled={busyRole !== null}
-                  className="switch"
                   onClick={() => void toggle(r)}
-                >
-                  <span />
-                </button>
+                />
               </li>
             );
           })}
         </ul>
-      </section>
+      </Section>
 
       {hasRole("reader") ? (
-        <section className="profile-section" aria-labelledby="delivery-title">
-          <h2 id="delivery-title">Daily joke</h2>
-          <dl className="settings">
-            <div>
-              <dt>
-                <label htmlFor="profile-hour">Arrives at</label>
-              </dt>
-              <dd>
-                <select
+        <Section id="delivery-title" title="Daily joke">
+          <dl className={rows}>
+            <Setting label={<label htmlFor="profile-hour">Arrives at</label>}>
+              <select
                   id="profile-hour"
+                  className={field("pill")}
                   value={deliveryHour}
                   onChange={(e) => setDeliveryHour(Number(e.target.value))}
                 >
@@ -165,88 +181,65 @@ export function Profile() {
                     </option>
                   ))}
                 </select>
-              </dd>
-            </div>
-            <div>
-              <dt>Time zone</dt>
-              <dd>{account.timezone.replace(/_/g, " ")}</dd>
-            </div>
-            <div>
-              <dt>Notifications on this device</dt>
-              <dd>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={notifications === "on"}
-                  aria-label="Notifications on this device"
-                  className="switch"
-                  disabled={pushBusy || notifications === "unsupported"}
-                  onClick={() => void togglePush()}
-                />
-              </dd>
-            </div>
-            <div>
-              <dt>Topics</dt>
-              <dd>{account.preferences.topics.length ? account.preferences.topics.map(titleCase).join(", ") : "Any"}</dd>
-            </div>
-            <div>
-              <dt>Subscribed to</dt>
-              <dd>
-                {subscriptions === null
-                  ? "…"
-                  : subscriptions.length
-                    ? subscriptions.map((c) => c.name).join(", ")
-                    : "No writers yet"}
-              </dd>
-            </div>
+            </Setting>
+            <Setting label="Time zone">{account.timezone.replace(/_/g, " ")}</Setting>
+            <Setting label="Notifications on this device">
+              <Switch
+                checked={notifications === "on"}
+                aria-label="Notifications on this device"
+                disabled={pushBusy || notifications === "unsupported"}
+                onClick={() => void togglePush()}
+              />
+            </Setting>
+            <Setting label="Topics">
+              {account.preferences.topics.length ? account.preferences.topics.map(titleCase).join(", ") : "Any"}
+            </Setting>
+            <Setting label="Subscribed to">
+              {subscriptions === null
+                ? "…"
+                : subscriptions.length
+                  ? subscriptions.map((c) => c.name).join(", ")
+                  : "No writers yet"}
+            </Setting>
           </dl>
-        </section>
+        </Section>
       ) : null}
 
       {hasRole("writer") ? (
-        <section className="profile-section" aria-labelledby="payout-title">
-          <h2 id="payout-title">Tips</h2>
-          <dl className="settings">
-            <div>
-              <dt>Paid to</dt>
-              <dd>
-                {account.payout
-                  ? `M-Pesa, ending ${account.payout.phoneLast3}${account.payout.verified ? "" : " (not confirmed yet)"}`
-                  : "Not set up. Tips wait in your account."}
-              </dd>
-            </div>
+        <Section id="payout-title" title="Tips">
+          <dl className={rows}>
+            <Setting label="Paid to">
+              {account.payout
+                ? `M-Pesa, ending ${account.payout.phoneLast3}${account.payout.verified ? "" : " (not confirmed yet)"}`
+                : "Not set up. Tips wait in your account."}
+            </Setting>
           </dl>
-        </section>
+        </Section>
       ) : null}
 
       {hasRole("curator") || hasRole("admin") ? (
-        <section className="profile-section" aria-labelledby="curation-title">
-          <h2 id="curation-title">Curation</h2>
-          <p className="profile-note">You can review submissions and pick the daily joke.</p>
-          <Link to="/curate" className="btn btn-quiet">
+        <Section id="curation-title" title="Curation">
+          <p className="text-sm text-ink-soft">You can review submissions and pick the daily joke.</p>
+          <Link to="/curate" className={button({ variant: "quiet" })}>
             Open the review queue
           </Link>
-        </section>
+        </Section>
       ) : null}
 
-      <section className="profile-section" aria-labelledby="account-title">
-        <h2 id="account-title">Account</h2>
-        <dl className="settings">
-          <div>
-            <dt>Email</dt>
-            <dd>{account.email}</dd>
-          </div>
+      <Section id="account-title" title="Account">
+        <dl className={rows}>
+          <Setting label="Email">{account.email}</Setting>
         </dl>
         <button
           type="button"
-          className="btn btn-quiet"
+          className={button({ variant: "quiet" })}
           onClick={() => {
             void signOut().then(() => navigate("/welcome", { replace: true }));
           }}
         >
           Sign out
         </button>
-      </section>
+      </Section>
     </div>
   );
 }

@@ -1,14 +1,13 @@
 import { Link } from "react-router";
+import { button } from "../components/ui/index.ts";
 
 /** Stand-in for screens planned in later steps. */
 export function Placeholder({ title, body }: { title: string; body: string }) {
   return (
-    <div
-      style={{ maxWidth: 560, margin: "0 auto", padding: "48px 16px", display: "grid", gap: 12 }}
-    >
-      <h1 style={{ fontSize: "var(--step-3)" }}>{title}</h1>
-      <p style={{ color: "var(--ink-soft)" }}>{body}</p>
-      <Link to="/" className="btn btn-quiet" style={{ justifySelf: "start" }}>
+    <div className="mx-auto grid max-w-[560px] gap-3 px-4 py-12">
+      <h1 className="text-3xl">{title}</h1>
+      <p className="text-ink-soft">{body}</p>
+      <Link to="/" className={button({ variant: "quiet", className: "justify-self-start" })}>
         Back to today's joke
       </Link>
     </div>

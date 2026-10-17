@@ -7,7 +7,35 @@ import { Icon } from "../components/Icon.tsx";
 import { StoryCard } from "../components/StoryCard.tsx";
 import type { JokeBackground } from "../data/types.ts";
 import { useStore } from "../state/useStore.ts";
-import "./Create.css";
+import {
+  CheckRow,
+  Chip,
+  IconButton,
+  Select,
+  TONE,
+  Textarea,
+  button,
+  cn,
+  errorText,
+  field,
+  fieldset,
+  help,
+  label,
+  segment,
+  segmented,
+} from "../components/ui/index.ts";
+
+/** Label on the left, character count on the right. */
+function FieldHead({ htmlFor, children, count }: { htmlFor: string; children: string; count: string }) {
+  return (
+    <div className="flex items-baseline justify-between">
+      <label htmlFor={htmlFor} className={label}>
+        {children}
+      </label>
+      <span className={help}>{count}</span>
+    </div>
+  );
+}
 
 const BACKGROUNDS: { value: JokeBackground; label: string }[] = [
   { value: "red", label: "Name-tag red" },
@@ -149,37 +177,34 @@ export function Create() {
       : "";
 
   return (
-    <form className="create" onSubmit={(e) => void onSubmit(e)} aria-labelledby="create-title">
-      <header className="create-head">
-        <button
-          type="button"
-          className="icon-btn"
-          onClick={() => void navigate(-1)}
-          aria-label="Discard and close"
-        >
+    <form className="mx-auto grid max-w-wide gap-4 px-4 lg:px-8 lg:pt-7" onSubmit={(e) => void onSubmit(e)} aria-labelledby="create-title">
+      <header className="-ml-2.5 flex items-center gap-2 pt-3 lg:pt-0">
+        <IconButton onClick={() => void navigate(-1)} aria-label="Discard and close">
           <Icon name="close" />
-        </button>
-        <h1 id="create-title">Write a joke</h1>
+        </IconButton>
+        <h1 id="create-title" className="text-2xl">
+          Write a joke
+        </h1>
       </header>
 
-      <p className="create-intro">
+      <p className="max-w-[62ch] text-ink-soft">
         Curators pick one joke each day from everyone's submissions. If yours is picked, every
         subscriber gets it at their delivery time, and you see the views, reactions and tips.
       </p>
 
-      <div className="create-grid">
-        <div className="create-form">
-          <fieldset className="segmented">
-            <legend className="visually-hidden">Joke format</legend>
+      <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-12">
+        <div className="grid min-w-0 gap-5.5">
+          <fieldset className={segmented}>
+            <legend className="sr-only">Joke format</legend>
             {(["text", "image"] as const).map((k) => (
-              <label key={k} className={`segmented-opt${kind === k ? " is-on" : ""}`}>
+              <label key={k} className={segment(kind === k)}>
                 <input
                   type="radio"
                   name="kind"
                   value={k}
                   checked={kind === k}
                   onChange={() => setKind(k)}
-                  className="visually-hidden"
+                  className="sr-only"
                 />
                 <Icon name={k === "text" ? "comment" : "image"} size={20} />
                 {k === "text" ? "Setup and punchline" : "Image or meme"}
@@ -189,15 +214,13 @@ export function Create() {
 
           {kind === "text" ? (
             <>
-              <div className="field">
-                <div className="field-label">
-                  <label htmlFor="setup">Setup</label>
-                  <span className="field-count">
-                    {setup.length}/{SETUP_MAX}
-                  </span>
-                </div>
-                <textarea
+              <div className={fieldset}>
+                <FieldHead htmlFor="setup" count={`${setup.length}/${SETUP_MAX}`}>
+                  Setup
+                </FieldHead>
+                <Textarea
                   id="setup"
+                  className="text-xl font-bold"
                   rows={3}
                   maxLength={SETUP_MAX}
                   value={setup}
@@ -205,32 +228,34 @@ export function Create() {
                   placeholder="Why did the scarecrow win an award?"
                 />
               </div>
-              <div className="field">
-                <div className="field-label">
-                  <label htmlFor="punchline">Punchline</label>
-                  <span className="field-count">
-                    {punchline.length}/{PUNCH_MAX}
-                  </span>
-                </div>
+              <div className={fieldset}>
+                <FieldHead htmlFor="punchline" count={`${punchline.length}/${PUNCH_MAX}`}>
+                  Punchline
+                </FieldHead>
                 <input
                   id="punchline"
+                  className={field("md", "font-marker text-xl")}
                   maxLength={PUNCH_MAX}
                   value={punchline}
                   onChange={(e) => setPunchline(e.target.value)}
                   placeholder="He was outstanding in his field."
                   autoComplete="off"
                 />
-                <p className="field-help">
+                <p className={help}>
                   Readers see the setup first. The punchline appears after a pause.
                 </p>
               </div>
-              <fieldset className="field">
-                <legend className="field-legend">Background</legend>
-                <div className="swatches">
+              <fieldset className={fieldset}>
+                <legend className={label}>Background</legend>
+                <div className="flex gap-2.5">
                   {BACKGROUNDS.map((b) => (
                     <label
                       key={b.value}
-                      className={`swatch story-bg-${b.value}${background === b.value ? " is-on" : ""}`}
+                      className={cn(
+                        "grid size-11 cursor-pointer place-items-center rounded-full border-3 border-paper has-focus-visible:outline-3 has-focus-visible:outline-offset-3 has-focus-visible:outline-denim",
+                        TONE[b.value],
+                        background === b.value ? "shadow-[0_0_0_3px_var(--color-ink)]" : "shadow-[0_0_0_1px_var(--color-line-strong)]",
+                      )}
                     >
                       <input
                         type="radio"
@@ -238,9 +263,9 @@ export function Create() {
                         value={b.value}
                         checked={background === b.value}
                         onChange={() => setBackground(b.value)}
-                        className="visually-hidden"
+                        className="sr-only"
                       />
-                      <span className="visually-hidden">{b.label}</span>
+                      <span className="sr-only">{b.label}</span>
                       {background === b.value ? <Icon name="check" size={18} /> : null}
                     </label>
                   ))}
@@ -249,45 +274,45 @@ export function Create() {
             </>
           ) : (
             <>
-              <div className="field">
-                <span className="field-legend">Image</span>
-                <label className={`dropzone${imageUrl ? " has-image" : ""}`}>
+              <div className={fieldset}>
+                <span className={label}>Image</span>
+                <label className="grid cursor-pointer justify-items-center gap-1 rounded-2xl border-2 border-dashed border-line-strong bg-paper px-4 py-7 text-center font-bold hover:border-ink has-focus-visible:border-ink">
                   <input
                     type="file"
                     accept={IMAGE_TYPES.join(",")}
                     onChange={(e) => void onFile(e)}
-                    className="visually-hidden"
+                    className="sr-only"
                     disabled={uploading}
                   />
                   <Icon name="image" size={28} />
                   <span>
                     {uploading ? "Uploading…" : imageKey ? "Choose a different image" : "Choose an image"}
                   </span>
-                  <span className="field-help">PNG, JPG, GIF or WebP, up to 10 MB</span>
+                  <span className={help}>PNG, JPG, GIF or WebP, up to 10 MB</span>
                 </label>
               </div>
-              <div className="field">
-                <div className="field-label">
-                  <label htmlFor="alt">Describe the image</label>
-                  <span className="field-count">{imageAlt.length}/200</span>
-                </div>
+              <div className={fieldset}>
+                <FieldHead htmlFor="alt" count={`${imageAlt.length}/200`}>
+                  Describe the image
+                </FieldHead>
                 <input
                   id="alt"
+                  className={field()}
                   maxLength={200}
                   value={imageAlt}
                   onChange={(e) => setImageAlt(e.target.value)}
                   placeholder="A dad holding a fish, looking proud"
                   autoComplete="off"
                 />
-                <p className="field-help">For people who use a screen reader. Required.</p>
+                <p className={help}>For people who use a screen reader. Required.</p>
               </div>
-              <div className="field">
-                <div className="field-label">
-                  <label htmlFor="caption">Caption (optional)</label>
-                  <span className="field-count">{caption.length}/80</span>
-                </div>
+              <div className={fieldset}>
+                <FieldHead htmlFor="caption" count={`${caption.length}/80`}>
+                  Caption (optional)
+                </FieldHead>
                 <input
                   id="caption"
+                  className={field()}
                   maxLength={80}
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
@@ -298,54 +323,42 @@ export function Create() {
             </>
           )}
 
-          <div className="field">
-            <label htmlFor="region" className="field-legend">
+          <div className={fieldset}>
+            <label htmlFor="region" className={label}>
               Who will get it?
             </label>
-            <select id="region" value={region} onChange={(e) => setRegion(e.target.value)}>
+            <Select id="region" value={region} onChange={(e) => setRegion(e.target.value)}>
               {REGIONS.map((r) => (
                 <option key={r}>{r}</option>
               ))}
-            </select>
-            <p className="field-help">Pick a country if the joke needs local knowledge to land.</p>
+            </Select>
+            <p className={help}>Pick a country if the joke needs local knowledge to land.</p>
           </div>
 
-          <fieldset className="field">
-            <legend className="field-legend">Topics (up to 3)</legend>
-            <div className="chips">
+          <fieldset className={fieldset}>
+            <legend className={label}>Topics (up to 3)</legend>
+            <div className="flex flex-wrap gap-2">
               {topicList.map((t) => (
-                <button
+                <Chip
                   key={t.slug}
-                  type="button"
-                  className={`chip${tags.includes(t.slug) ? " is-on" : ""}`}
-                  aria-pressed={tags.includes(t.slug)}
+                  on={tags.includes(t.slug)}
                   onClick={() => toggleTag(t.slug)}
                   disabled={!tags.includes(t.slug) && tags.length >= 3}
                 >
                   {t.label}
-                </button>
+                </Chip>
               ))}
             </div>
           </fieldset>
 
-          <label className="original">
-            <input
-              type="checkbox"
-              checked={original}
-              onChange={(e) => setOriginal(e.target.checked)}
-            />
-            <span>
-              <strong>I wrote this joke myself.</strong>
-              <span className="field-help">
-                Jokes copied from elsewhere are taken down and don't earn tips.
-              </span>
-            </span>
-          </label>
+          <CheckRow checked={original} onChange={setOriginal} title="I wrote this joke myself.">
+            Jokes copied from elsewhere are taken down and don't earn tips.
+          </CheckRow>
 
-          <div className="create-submit">
+          <div className="sticky bottom-[calc(var(--spacing-nav)+env(safe-area-inset-bottom))] grid gap-2 bg-[linear-gradient(transparent,var(--color-fridge)_30%)] py-3 lg:bottom-0">
             <button
               type="submit"
-              className="btn btn-primary btn-block"
+              className={button({ block: true })}
               disabled={!ready || sending}
               aria-describedby="submit-hint"
             >
@@ -353,7 +366,7 @@ export function Create() {
             </button>
             <p
               id="submit-hint"
-              className={serverError ? "field-help field-error" : "field-help"}
+              className={serverError ? errorText : help}
               aria-live="polite"
             >
               {serverError || missing}
@@ -361,20 +374,20 @@ export function Create() {
           </div>
         </div>
 
-        <aside className="create-preview" aria-label="Preview">
-          <div className="create-preview-head">
-            <h2>Preview</h2>
+        <aside className="-order-1 grid content-start gap-3 lg:sticky lg:top-7 lg:order-none" aria-label="Preview">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base">Preview</h2>
             {kind === "text" ? (
               <button
                 type="button"
-                className="btn btn-quiet btn-small"
+                className={button({ variant: "quiet", size: "sm" })}
                 onClick={() => setShowPunch((s) => !s)}
               >
                 {showPunch ? "Show setup only" : "Show punchline"}
               </button>
             ) : null}
           </div>
-          <div className="create-preview-card">
+          <div className="max-w-[170px] lg:max-w-none">
             <StoryCard
               face={
                 kind === "text"

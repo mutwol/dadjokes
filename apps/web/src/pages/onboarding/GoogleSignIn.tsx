@@ -55,5 +55,5 @@ export function GoogleSignIn({ onToken }: { onToken: (idToken: string) => void }
   }, []);
 
   if (!CLIENT_ID) return null;
-  return <div ref={ref} className="google-btn" />;
+  return <div ref={ref} className="flex min-h-11 justify-center" />;
 }

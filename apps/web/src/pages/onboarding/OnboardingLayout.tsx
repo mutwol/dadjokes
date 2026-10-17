@@ -4,12 +4,12 @@ import { ApiError, api, errorMessage, unwrap } from "../../api/client.ts";
 import { Icon } from "../../components/Icon.tsx";
 import { NameTag } from "../../components/NameTag.tsx";
 import { StoryCard } from "../../components/StoryCard.tsx";
+import { IconButton, Toast } from "../../components/ui/index.ts";
 import { SAMPLE_JOKE } from "../../data/sample.ts";
 import type { OnboardingDraft } from "../../data/types.ts";
 import { useStore } from "../../state/useStore.ts";
 import { browserTimeZone, EMPTY_DRAFT, firstName, SIGN_IN_STEPS, stepsFor } from "./flow.ts";
 import type { Flow, StepId } from "./flow.ts";
-import "./Onboarding.css";
 
 export function OnboardingLayout() {
   const { status, account, setAccount, setNotifications, toast } = useStore();
@@ -96,37 +96,36 @@ export function OnboardingLayout() {
   const backTarget = index > 0 && !(account && steps[index - 1] === "verify") ? `/welcome/${steps[index - 1]}` : null;
 
   return (
-    <div className="ob">
-      <aside className="ob-art story-bg-red" aria-hidden="true">
+    <div className="min-h-dvh bg-fridge lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+      {/* Desktop: the sticker panel on the left, the form on the right. */}
+      <aside
+        className="sticky top-0 hidden h-dvh place-items-center bg-tag-red p-12 text-white lg:grid"
+        aria-hidden="true"
+      >
         {current === "" && sample ? (
-          <div className="ob-art-sample">
+          <div className="w-[min(340px,80%)] -rotate-3 rounded-3xl shadow-lift outline-6 outline-white/90">
             <StoryCard face={sample} revealed variant="card" />
           </div>
         ) : (
-          <div className="ob-art-tag">
-            <NameTag name={name || "…"} size="l" tilt={-6} />
-            <p>{name ? `Hi ${name}, I'm Dad.` : "Every dad joke starts with an introduction."}</p>
+          <div className="grid justify-items-center gap-7 text-center">
+            <NameTag name={name || "…"} size="l" tilt={-6} className="scale-160" />
+            <p className="mt-6 max-w-[16ch] font-marker text-2xl">{name ? `Hi ${name}, I'm Dad.` : "Every dad joke starts with an introduction."}</p>
           </div>
         )}
       </aside>
 
-      <main className="ob-main">
+      <main className="mx-auto max-w-onboarding px-4 pb-[calc(32px+env(safe-area-inset-bottom))] lg:w-full lg:max-w-form lg:px-12 lg:pb-12">
         {current !== "" && current !== "done" ? (
-          <header className="ob-top">
+          <header className="sticky top-0 z-5 -ml-2.5 flex items-center gap-2 bg-fridge py-2.5 lg:pt-7">
             {backTarget || index === 0 ? (
-              <button
-                type="button"
-                className="icon-btn"
-                onClick={() => void navigate(backTarget ?? "/welcome")}
-                aria-label="Back"
-              >
+              <IconButton onClick={() => void navigate(backTarget ?? "/welcome")} aria-label="Back">
                 <Icon name="back" />
-              </button>
+              </IconButton>
             ) : (
-              <span className="icon-btn" aria-hidden="true" />
+              <span className="size-11" aria-hidden="true" />
             )}
             <div
-              className="ob-progress"
+              className="h-1.5 flex-1 overflow-hidden rounded-full bg-line"
               role="progressbar"
               aria-label="Sign-up progress"
               aria-valuemin={1}
@@ -134,20 +133,18 @@ export function OnboardingLayout() {
               aria-valuenow={index + 1}
               aria-valuetext={`Step ${index + 1} of ${steps.length}`}
             >
-              <span style={{ width: `${((index + 1) / steps.length) * 100}%` }} />
+              <span
+                className="block h-full rounded-[inherit] bg-tag-red transition-[width] duration-320 ease-out"
+                style={{ width: `${((index + 1) / steps.length) * 100}%` }} />
             </div>
           </header>
         ) : null}
-        <div className="ob-body">
+        <div className="pt-4 lg:pt-6">
           <Outlet context={flow} />
         </div>
       </main>
 
-      {toast ? (
-        <div className="toast toast-bottom" role="status">
-          {toast}
-        </div>
-      ) : null}
+      {toast ? <Toast placement="bottom">{toast}</Toast> : null}
     </div>
   );
 }

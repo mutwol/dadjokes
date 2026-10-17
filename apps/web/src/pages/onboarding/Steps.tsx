@@ -15,6 +15,36 @@ import { firstName, handleFromName, useFlow } from "./flow.ts";
 import { enablePush } from "../../api/push.ts";
 import { googleEnabled } from "../../config.ts";
 import { GoogleSignIn } from "./GoogleSignIn.tsx";
+import {
+  Card,
+  CheckRow,
+  Chip,
+  button,
+  choice,
+  cn,
+  errorText,
+  field,
+  fieldset,
+  help,
+  label,
+  textButton,
+} from "../../components/ui/index.ts";
+
+/* Shared by every step. */
+const step = "grid gap-5";
+const title = "text-3xl";
+const lead = "-mt-2 text-ink-soft";
+const small = "text-center text-sm text-ink-soft";
+const fine = "text-center text-xs text-ink-faint";
+const actions = "mt-1 grid gap-2.5";
+const success = "text-sm font-bold text-forest";
+const primary = button({ size: "lg", block: true });
+const secondary = button({ variant: "quiet", size: "lg", block: true });
+
+/** A field with a fixed prefix ("@", "+254") drawn inside its border. */
+const prefixed =
+  "flex items-center rounded-2xl border-2 border-line-strong bg-paper pl-3.5 focus-within:border-ink has-aria-invalid:border-tag-red";
+const prefixedInput = "min-h-12 w-full border-0 bg-transparent pr-3.5 pl-1.5 text-base focus:outline-none";
 
 /* ------------------------------------------------------------------ Welcome */
 
@@ -35,28 +65,28 @@ export function WelcomeStep() {
   };
 
   return (
-    <section className="ob-step ob-welcome" aria-labelledby="welcome-title">
+    <section className={cn(step, "justify-items-start pt-10 lg:pt-[15dvh]")} aria-labelledby="welcome-title">
       <NameTag name="Daddy Jokes" size="l" tilt={-5} />
-      <h1 id="welcome-title" className="ob-hero">
+      <h1 id="welcome-title" className="text-4xl leading-[1.05] tracking-[-0.02em]">
         One dad joke a day, delivered like a status.
       </h1>
-      <p className="ob-lead">
+      <p className={cn(lead, "-mt-1.5")}>
         Read a hand-picked joke every morning, or write your own and get tipped when it lands. Or
         both.
       </p>
       {sample ? (
-        <div className="ob-welcome-sample" aria-hidden="true">
+        <div className="w-full rotate-[1.5deg] lg:hidden" aria-hidden="true">
           <StoryCard face={sample} revealed variant="inline" />
         </div>
       ) : null}
-      <div className="ob-actions">
-        <button type="button" className="btn btn-primary btn-block" onClick={() => goTo("email")}>
+      <div className={cn(actions, "w-full")}>
+        <button type="button" className={primary} onClick={() => goTo("email")}>
           Continue with email
         </button>
         {googleEnabled ? <GoogleSignIn onToken={(t) => void onGoogle(t)} /> : null}
       </div>
-      <p className="ob-small">New here or coming back, it's the same: we email you a code.</p>
-      <p className="ob-fine">
+      <p className={cn(small, "justify-self-stretch")}>New here or coming back, it's the same: we email you a code.</p>
+      <p className={cn(fine, "justify-self-stretch")}>
         By continuing you agree to the <a href="#terms">Terms</a> and{" "}
         <a href="#privacy">Privacy Policy</a>.
       </p>
@@ -100,13 +130,14 @@ export function EmailStep() {
   };
 
   return (
-    <form className="ob-step" onSubmit={(e) => void onSubmit(e)} aria-labelledby="email-title" noValidate>
-      <h1 id="email-title">What's your email?</h1>
-      <p className="ob-lead">We'll send you a 6-digit code. No password to remember.</p>
-      <div className="ob-field">
-        <label htmlFor="email">Email</label>
+    <form className={step} onSubmit={(e) => void onSubmit(e)} aria-labelledby="email-title" noValidate>
+      <h1 id="email-title" className={title}>What's your email?</h1>
+      <p className={lead}>We'll send you a 6-digit code. No password to remember.</p>
+      <div className={fieldset}>
+        <label htmlFor="email" className={label}>Email</label>
         <input
           id="email"
+          className={field("lg")}
           type="email"
           inputMode="email"
           autoComplete="email"
@@ -121,13 +152,13 @@ export function EmailStep() {
           placeholder="name@example.com"
         />
         {error ? (
-          <p id="email-error" className="ob-error" role="alert">
+          <p id="email-error" className={errorText} role="alert">
             {error}
           </p>
         ) : null}
       </div>
-      <div className="ob-actions">
-        <button type="submit" className="btn btn-primary btn-block" disabled={!email.trim() || sending}>
+      <div className={actions}>
+        <button type="submit" className={primary} disabled={!email.trim() || sending}>
           {sending ? "Sending…" : "Send code"}
         </button>
       </div>
@@ -222,10 +253,10 @@ export function VerifyStep() {
 
   if (!draft.email) {
     return (
-      <section className="ob-step">
-        <h1>Start with your email</h1>
-        <p className="ob-lead">We need your email address to send you a code.</p>
-        <button type="button" className="btn btn-primary btn-block" onClick={() => goTo("email")}>
+      <section className={step}>
+        <h1 className={title}>Start with your email</h1>
+        <p className={lead}>We need your email address to send you a code.</p>
+        <button type="button" className={button({ block: true })} onClick={() => goTo("email")}>
           Enter email
         </button>
       </section>
@@ -233,19 +264,20 @@ export function VerifyStep() {
   }
 
   return (
-    <form className="ob-step" onSubmit={(e) => void onSubmit(e)} aria-labelledby="verify-title">
-      <h1 id="verify-title">Check your email</h1>
-      <p className="ob-lead">
+    <form className={step} onSubmit={(e) => void onSubmit(e)} aria-labelledby="verify-title">
+      <h1 id="verify-title" className={title}>Check your email</h1>
+      <p className={lead}>
         We sent a 6-digit code to <strong>{masked}</strong>. Enter it below.
       </p>
-      <fieldset className="otp" onPaste={onPaste}>
-        <legend className="visually-hidden">Verification code</legend>
+      <fieldset className="m-0 grid grid-cols-6 gap-2 border-0 p-0" onPaste={onPaste}>
+        <legend className="sr-only">Verification code</legend>
         {digits.map((d, i) => (
           <input
             key={i}
             ref={(el) => {
               refs.current[i] = el;
             }}
+            className="aspect-[4/5] max-h-18 w-full rounded-2xl border-2 border-line-strong bg-paper text-center text-2xl font-extrabold caret-tag-red focus:border-ink focus:shadow-[0_0_0_3px_rgb(28_35_64/0.12)] focus:outline-none aria-invalid:border-tag-red"
             value={d}
             onChange={(e) => onChange(i, e.target.value)}
             onKeyDown={(e) => onKeyDown(i, e)}
@@ -260,21 +292,21 @@ export function VerifyStep() {
         ))}
       </fieldset>
       {error ? (
-        <p className="ob-error" role="alert">
+        <p className={errorText} role="alert">
           {error}
         </p>
       ) : null}
-      <div className="ob-actions">
-        <button type="submit" className="btn btn-primary btn-block" disabled={code.length < CODE_LENGTH || checking}>
+      <div className={actions}>
+        <button type="submit" className={primary} disabled={code.length < CODE_LENGTH || checking}>
           {checking ? "Checking…" : "Continue"}
         </button>
-        <button type="button" className="btn btn-quiet btn-block" onClick={() => void resend()}>
+        <button type="button" className={secondary} onClick={() => void resend()}>
           Send a new code
         </button>
       </div>
-      <p className="ob-small">
+      <p className={small}>
         Wrong address?{" "}
-        <button type="button" className="link-btn" onClick={() => goTo("email")}>
+        <button type="button" className={textButton} onClick={() => goTo("email")}>
           Use a different email
         </button>
       </p>
@@ -317,46 +349,60 @@ export function RoleStep() {
 
   return (
     <form
-      className="ob-step"
+      className={step}
       onSubmit={(e) => {
         e.preventDefault();
         if (roles.length) next();
       }}
       aria-labelledby="role-title"
     >
-      <h1 id="role-title">How will you use Daddy Jokes?</h1>
-      <p className="ob-lead">Pick one or both. You can change this later in your profile.</p>
-      <fieldset className="role-cards">
-        <legend className="visually-hidden">Ways to use Daddy Jokes</legend>
+      <h1 id="role-title" className={title}>How will you use Daddy Jokes?</h1>
+      <p className={lead}>Pick one or both. You can change this later in your profile.</p>
+      <fieldset className="m-0 grid gap-3 border-0 p-0">
+        <legend className="sr-only">Ways to use Daddy Jokes</legend>
         {ROLE_OPTIONS.map((o) => {
           const on = roles.includes(o.role);
           return (
-            <label key={o.role} className={`role-card${on ? " is-on" : ""}`}>
+            <label
+              key={o.role}
+              className={choice(on, {
+                className: cn(
+                  "flex items-start gap-3.5 rounded-3xl p-4.5 transition-[border-color,background-color] duration-120",
+                  !on && "hover:border-line-strong",
+                ),
+              })}
+            >
               <input
                 type="checkbox"
                 checked={on}
                 onChange={() => toggle(o.role)}
-                className="visually-hidden"
+                className="sr-only"
               />
-              <span className="role-emoji" aria-hidden="true">
+              <span className="text-[2rem] leading-none" aria-hidden="true">
                 {o.emoji}
               </span>
-              <span className="role-text">
-                <strong>{o.title}</strong>
-                <span>{o.body}</span>
+              <span className="grid flex-1 gap-1">
+                <strong className="text-xl leading-[1.2]">{o.title}</strong>
+                <span className="text-sm text-ink-soft">{o.body}</span>
               </span>
-              <span className="role-check" aria-hidden="true">
+              <span
+                className={cn(
+                  "grid size-7 shrink-0 place-items-center rounded-lg border-2",
+                  on ? "border-ink bg-ink text-white" : "border-line-strong bg-paper",
+                )}
+                aria-hidden="true"
+              >
                 {on ? <Icon name="check" size={18} /> : null}
               </span>
             </label>
           );
         })}
       </fieldset>
-      <p className="ob-small" aria-live="polite">
+      <p className={small} aria-live="polite">
         {summary}
       </p>
-      <div className="ob-actions">
-        <button type="submit" className="btn btn-primary btn-block" disabled={!roles.length}>
+      <div className={actions}>
+        <button type="submit" className={primary} disabled={!roles.length}>
           Continue
         </button>
       </div>
@@ -428,7 +474,7 @@ export function ProfileStep() {
 
   return (
     <form
-      className="ob-step"
+      className={step}
       onSubmit={(e) => {
         e.preventDefault();
         if (!valid) return;
@@ -437,22 +483,23 @@ export function ProfileStep() {
       }}
       aria-labelledby="profile-title"
     >
-      <h1 id="profile-title">Introduce yourself</h1>
-      <p className="ob-lead">
+      <h1 id="profile-title" className={title}>Introduce yourself</h1>
+      <p className={lead}>
         {writer
           ? "This is the name on your sticker when your joke goes out."
           : "This is how you show up when you comment or react."}
       </p>
 
-      <div className="ob-profile-preview" aria-hidden="true">
+      <div className="flex items-center gap-4" aria-hidden="true">
         <Avatar name={draft.name || "?"} tone="denim" size={56} />
         <NameTag name={firstName(draft.name) || "…"} size="m" tilt={-4} />
       </div>
 
-      <div className="ob-field">
-        <label htmlFor="name">Name</label>
+      <div className={fieldset}>
+        <label htmlFor="name" className={label}>Name</label>
         <input
           id="name"
+          className={field("lg")}
           autoComplete="name"
           autoFocus
           value={draft.name}
@@ -461,12 +508,13 @@ export function ProfileStep() {
         />
       </div>
 
-      <div className="ob-field">
-        <label htmlFor="handle">Username</label>
-        <div className="ob-prefix">
-          <span aria-hidden="true">@</span>
+      <div className={fieldset}>
+        <label htmlFor="handle" className={label}>Username</label>
+        <div className={prefixed}>
+          <span className="font-bold text-ink-soft" aria-hidden="true">@</span>
           <input
             id="handle"
+            className={prefixedInput}
             autoComplete="username"
             autoCapitalize="none"
             spellCheck={false}
@@ -480,29 +528,30 @@ export function ProfileStep() {
             aria-describedby="handle-help"
           />
         </div>
-        <p id="handle-help" className={handleBad ? "ob-error" : "ob-help"} aria-live="polite">
+        <p id="handle-help" className={handleBad ? errorText : help} aria-live="polite">
           {handleMessage}
         </p>
       </div>
 
-      <div className="ob-field">
-        <label htmlFor="country">Country</label>
-        <select id="country" value={draft.country} onChange={(e) => update({ country: e.target.value })}>
+      <div className={fieldset}>
+        <label htmlFor="country" className={label}>Country</label>
+        <select id="country" className={field("lg")} value={draft.country} onChange={(e) => update({ country: e.target.value })}>
           {COUNTRIES.map((c) => (
             <option key={c}>{c}</option>
           ))}
         </select>
-        <p className="ob-help">Some jokes only land if you know the place. We use this to pick them.</p>
+        <p className={help}>Some jokes only land if you know the place. We use this to pick them.</p>
       </div>
 
       {writer ? (
-        <div className="ob-field">
-          <div className="ob-label-row">
-            <label htmlFor="bio">One-line bio</label>
-            <span className="ob-help">{draft.bio.length}/80</span>
+        <div className={fieldset}>
+          <div className="flex items-baseline justify-between">
+            <label htmlFor="bio" className={label}>One-line bio</label>
+            <span className={help}>{draft.bio.length}/80</span>
           </div>
           <input
             id="bio"
+            className={field("lg")}
             maxLength={80}
             value={draft.bio}
             onChange={(e) => update({ bio: e.target.value })}
@@ -511,8 +560,8 @@ export function ProfileStep() {
         </div>
       ) : null}
 
-      <div className="ob-actions">
-        <button type="submit" className="btn btn-primary btn-block" disabled={!valid}>
+      <div className={actions}>
+        <button type="submit" className={primary} disabled={!valid}>
           Continue
         </button>
       </div>
@@ -550,60 +599,55 @@ export function TopicsStep() {
 
   return (
     <form
-      className="ob-step"
+      className={step}
       onSubmit={(e) => {
         e.preventDefault();
         next();
       }}
       aria-labelledby="topics-title"
     >
-      <h1 id="topics-title">What makes you groan?</h1>
-      <p className="ob-lead">Pick a few topics. Curators use them to choose your daily joke.</p>
-      <fieldset className="ob-field">
-        <legend className="visually-hidden">Topics</legend>
-        {topics.error ? <p className="ob-error">{topics.error}</p> : null}
-        <div className="chips chips-lg" aria-busy={!topics.data && !topics.error}>
+      <h1 id="topics-title" className={title}>What makes you groan?</h1>
+      <p className={lead}>Pick a few topics. Curators use them to choose your daily joke.</p>
+      <fieldset className={fieldset}>
+        <legend className="sr-only">Topics</legend>
+        {topics.error ? <p className={errorText}>{topics.error}</p> : null}
+        <div className="flex flex-wrap gap-2" aria-busy={!topics.data && !topics.error}>
           {(topics.data ?? []).map((t: Topic) => (
-            <button
-              key={t.slug}
-              type="button"
-              className={`chip${draft.topics.includes(t.slug) ? " is-on" : ""}`}
-              aria-pressed={draft.topics.includes(t.slug)}
-              onClick={() => toggle(t.slug)}
-            >
+            <Chip key={t.slug} size="lg" on={draft.topics.includes(t.slug)} onClick={() => toggle(t.slug)}>
               {t.label}
-            </button>
+            </Chip>
           ))}
         </div>
       </fieldset>
 
-      <fieldset className="ob-field">
-        <legend className="ob-legend">Where should jokes come from?</legend>
-        <div className="radio-list">
+      <fieldset className={fieldset}>
+        <legend className={label}>Where should jokes come from?</legend>
+        <div className="grid gap-2.5">
           {(
             [
               ["everywhere", "Everywhere", "Jokes that work for anyone."],
               ["local", `Mostly ${local}`, "Include jokes that need local knowledge to land."],
             ] as const
           ).map(([value, title, body]) => (
-            <label key={value} className={`radio-row${draft.jokeOrigin === value ? " is-on" : ""}`}>
+            <label key={value} className={choice(draft.jokeOrigin === value, { tint: false, className: "flex items-start gap-3 rounded-2xl px-4 py-3.5 has-focus-visible:shadow-none" })}>
               <input
+                className="mt-0.5 size-5 shrink-0 accent-ink" 
                 type="radio"
                 name="origin"
                 checked={draft.jokeOrigin === value}
                 onChange={() => update({ jokeOrigin: value })}
               />
-              <span>
+              <span className="grid gap-0.5">
                 <strong>{title}</strong>
-                <span>{body}</span>
+                <span className="text-sm text-ink-soft">{body}</span>
               </span>
             </label>
           ))}
         </div>
       </fieldset>
 
-      <div className="ob-actions">
-        <button type="submit" className="btn btn-primary btn-block">
+      <div className={actions}>
+        <button type="submit" className={primary}>
           {draft.topics.length ? "Continue" : "Skip for now"}
         </button>
       </div>
@@ -626,36 +670,36 @@ export function FollowStep() {
 
   return (
     <form
-      className="ob-step"
+      className={step}
       onSubmit={(e) => {
         e.preventDefault();
         next();
       }}
       aria-labelledby="follow-title"
     >
-      <h1 id="follow-title">Subscribe to writers</h1>
-      <p className="ob-lead">
+      <h1 id="follow-title" className={title}>Subscribe to writers</h1>
+      <p className={lead}>
         Their jokes are more likely to be your daily pick, and you hear when one of theirs goes out.
       </p>
-      {writers.error ? <p className="ob-error">{writers.error}</p> : null}
-      {writers.data && !writers.data.length ? <p className="ob-help">No writers yet. You can subscribe later.</p> : null}
-      <ul className="follow-list" aria-busy={!writers.data && !writers.error}>
+      {writers.error ? <p className={errorText}>{writers.error}</p> : null}
+      {writers.data && !writers.data.length ? <p className={help}>No writers yet. You can subscribe later.</p> : null}
+      <ul className="m-0 grid list-none p-0" aria-busy={!writers.data && !writers.error}>
         {(writers.data ?? []).map((c: Creator) => {
           const on = draft.following.includes(c.id);
           return (
-            <li key={c.id} className="follow-row">
+            <li key={c.id} className="flex items-center gap-3 border-t border-line py-3.5">
               <Avatar name={c.name} tone={c.tone} size={44} />
-              <div className="follow-text">
-                <p className="byline-name">{c.name}</p>
-                {c.bio ? <p className="follow-bio">{c.bio}</p> : null}
-                <p className="byline-sub">
+              <div className="min-w-0 flex-1">
+                <p className="leading-[1.25] font-extrabold">{c.name}</p>
+                {c.bio ? <p className="my-0.5 text-sm">{c.bio}</p> : null}
+                <p className="text-sm text-ink-soft">
                   {c.country ? `${c.country}, ` : ""}
                   {compact(c.subscriberCount)} {c.subscriberCount === 1 ? "subscriber" : "subscribers"}
                 </p>
               </div>
               <button
                 type="button"
-                className={`btn btn-small ${on ? "btn-quiet" : "btn-primary"}`}
+                className={button({ variant: on ? "quiet" : "primary", size: "sm" })}
                 aria-pressed={on}
                 aria-label={`${on ? "Unsubscribe from" : "Subscribe to"} ${c.name}`}
                 onClick={() => toggle(c.id)}
@@ -667,8 +711,8 @@ export function FollowStep() {
           );
         })}
       </ul>
-      <div className="ob-actions ob-actions-sticky">
-        <button type="submit" className="btn btn-primary btn-block">
+      <div className={cn(actions, "sticky bottom-0 bg-[linear-gradient(transparent,var(--color-fridge)_28%)] pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]")}>
+        <button type="submit" className={primary}>
           {count ? `Continue with ${count} ${count === 1 ? "writer" : "writers"}` : "Skip for now"}
         </button>
       </div>
@@ -702,48 +746,53 @@ export function DeliveryStep() {
 
   return (
     <form
-      className="ob-step"
+      className={step}
       onSubmit={(e) => {
         e.preventDefault();
         next();
       }}
       aria-labelledby="delivery-title"
     >
-      <h1 id="delivery-title">When should your joke arrive?</h1>
-      <p className="ob-lead">One joke a day at this time. It stays up for 24 hours.</p>
+      <h1 id="delivery-title" className={title}>When should your joke arrive?</h1>
+      <p className={lead}>One joke a day at this time. It stays up for 24 hours.</p>
 
-      <fieldset className="ob-field">
-        <legend className="visually-hidden">Delivery time</legend>
-        <div className="time-grid">
+      <fieldset className={fieldset}>
+        <legend className="sr-only">Delivery time</legend>
+        <div className="grid grid-cols-3 gap-2">
           {HOURS.map((h) => (
-            <label key={h} className={`time-opt${draft.deliveryHour === h ? " is-on" : ""}`}>
+            <label
+              key={h}
+              className={choice(draft.deliveryHour === h, {
+                className: "grid justify-items-center gap-0.5 rounded-2xl px-1.5 py-3 text-center",
+              })}
+            >
               <input
                 type="radio"
                 name="hour"
                 checked={draft.deliveryHour === h}
                 onChange={() => update({ deliveryHour: h })}
-                className="visually-hidden"
+                className="sr-only"
               />
-              <strong>{formatHour(h)}</strong>
-              <span>{h < 12 ? "with breakfast" : h < 15 ? "at lunch" : h < 19 ? "after work" : "before bed"}</span>
+              <strong className="text-xl">{formatHour(h)}</strong>
+              <span className="text-xs text-ink-soft">{h < 12 ? "with breakfast" : h < 15 ? "at lunch" : h < 19 ? "after work" : "before bed"}</span>
             </label>
           ))}
         </div>
       </fieldset>
 
-      <div className="notify-card">
+      <Card className="flex items-start gap-3 p-4">
         <Icon name="bell" />
-        <div>
+        <div className="grid flex-1 gap-1">
           <strong>Get a notification when it lands</strong>
-          <p>We send one a day, nothing else unless you ask for it.</p>
+          <p className="text-sm text-ink-soft">We send one a day, nothing else unless you ask for it.</p>
           {ios && draft.notifications !== "on" ? (
-            <p className="ob-help">
+            <p className={help}>
               On iPhone, add Daddy Jokes to your Home Screen first (Share, then Add to Home Screen).
               Notifications only work from there.
             </p>
           ) : null}
           {status ? (
-            <p className={draft.notifications === "on" ? "ob-success" : "ob-help"} role="status">
+            <p className={draft.notifications === "on" ? success : help} role="status">
               {status}
             </p>
           ) : null}
@@ -751,17 +800,17 @@ export function DeliveryStep() {
         {draft.notifications === "on" ? null : (
           <button
             type="button"
-            className="btn btn-quiet btn-small"
+            className={button({ variant: "quiet", size: "sm" })}
             onClick={() => void enable()}
             disabled={draft.notifications === "unsupported"}
           >
             Turn on
           </button>
         )}
-      </div>
+      </Card>
 
-      <div className="ob-actions">
-        <button type="submit" className="btn btn-primary btn-block">
+      <div className={actions}>
+        <button type="submit" className={primary}>
           Continue
         </button>
       </div>
@@ -782,7 +831,7 @@ export function PayoutsStep() {
 
   return (
     <form
-      className="ob-step"
+      className={step}
       onSubmit={(e) => {
         e.preventDefault();
         if (!valid) return;
@@ -791,39 +840,40 @@ export function PayoutsStep() {
       }}
       aria-labelledby="payouts-title"
     >
-      <h1 id="payouts-title">Get paid for your jokes</h1>
-      <p className="ob-lead">
+      <h1 id="payouts-title" className={title}>Get paid for your jokes</h1>
+      <p className={lead}>
         Readers can tip you when your joke goes out. Later, writers will also earn a share based on
         views.
       </p>
 
-      <fieldset className="ob-field">
-        <legend className="ob-legend">Where should tips go?</legend>
-        <div className="radio-list">
-          <label className={`radio-row${method === "mpesa" ? " is-on" : ""}`}>
-            <input type="radio" name="payout" checked={method === "mpesa"} onChange={() => setMethod("mpesa")} />
-            <span>
+      <fieldset className={fieldset}>
+        <legend className={label}>Where should tips go?</legend>
+        <div className="grid gap-2.5">
+          <label className={choice(method === "mpesa", { tint: false, className: "flex items-start gap-3 rounded-2xl px-4 py-3.5 has-focus-visible:shadow-none" })}>
+            <input className="mt-0.5 size-5 shrink-0 accent-ink" type="radio" name="payout" checked={method === "mpesa"} onChange={() => setMethod("mpesa")} />
+            <span className="grid gap-0.5">
               <strong>M-Pesa</strong>
-              <span>Tips arrive on your phone within a day.</span>
+              <span className="text-sm text-ink-soft">Tips arrive on your phone within a day.</span>
             </span>
           </label>
-          <label className={`radio-row${method === "later" ? " is-on" : ""}`}>
-            <input type="radio" name="payout" checked={method === "later"} onChange={() => setMethod("later")} />
-            <span>
+          <label className={choice(method === "later", { tint: false, className: "flex items-start gap-3 rounded-2xl px-4 py-3.5 has-focus-visible:shadow-none" })}>
+            <input className="mt-0.5 size-5 shrink-0 accent-ink" type="radio" name="payout" checked={method === "later"} onChange={() => setMethod("later")} />
+            <span className="grid gap-0.5">
               <strong>Set up later</strong>
-              <span>Tips wait in your account until you add a payout method.</span>
+              <span className="text-sm text-ink-soft">Tips wait in your account until you add a payout method.</span>
             </span>
           </label>
         </div>
       </fieldset>
 
       {method === "mpesa" ? (
-        <div className="ob-field">
-          <label htmlFor="phone">M-Pesa phone number</label>
-          <div className="ob-prefix">
-            <span aria-hidden="true">+254</span>
+        <div className={fieldset}>
+          <label htmlFor="phone" className={label}>M-Pesa phone number</label>
+          <div className={prefixed}>
+            <span className="font-bold text-ink-soft" aria-hidden="true">+254</span>
             <input
               id="phone"
+              className={prefixedInput}
               type="tel"
               inputMode="tel"
               autoComplete="tel-national"
@@ -834,22 +884,18 @@ export function PayoutsStep() {
               aria-describedby="phone-help"
             />
           </div>
-          <p id="phone-help" className={phone && !phoneOk ? "ob-error" : "ob-help"}>
+          <p id="phone-help" className={phone && !phoneOk ? errorText : help}>
             {phone && !phoneOk ? "Enter a Kenyan mobile number, like 712 345 678." : "We'll send a test payment of KES 1 to confirm it."}
           </p>
         </div>
       ) : null}
 
-      <label className="original">
-        <input type="checkbox" checked={pledge} onChange={(e) => setPledge(e.target.checked)} />
-        <span>
-          <strong>I'll only submit jokes I wrote myself.</strong>
-          <span className="field-help">Copied jokes are taken down and their tips are returned.</span>
-        </span>
-      </label>
+      <CheckRow checked={pledge} onChange={setPledge} title="I'll only submit jokes I wrote myself.">
+        Copied jokes are taken down and their tips are returned.
+      </CheckRow>
 
-      <div className="ob-actions">
-        <button type="submit" className="btn btn-primary btn-block" disabled={!valid}>
+      <div className={actions}>
+        <button type="submit" className={primary} disabled={!valid}>
           Continue
         </button>
       </div>
@@ -867,13 +913,13 @@ export function DoneStep() {
   const error = saveError?.step === "done" ? saveError.message : "";
 
   return (
-    <section className="ob-step ob-done" aria-labelledby="done-title">
+    <section className={cn(step, "justify-items-start pt-12")} aria-labelledby="done-title">
       <NameTag name={name} size="l" tilt={-6} />
-      <h1 id="done-title">You're nearly in, {name}.</h1>
-      <ul className="done-list">
+      <h1 id="done-title" className={title}>You're nearly in, {name}.</h1>
+      <ul className="m-0 grid list-none gap-3 p-0">
         {reader ? (
-          <li>
-            <Icon name="clock" size={20} />
+          <li className="flex items-start gap-2.5">
+            <Icon name="clock" size={20} className="mt-0.5 shrink-0 text-tag-red" />
             <span>
               Your joke arrives every day at <strong>{formatHour(draft.deliveryHour)}</strong>.
               Today's is already waiting.
@@ -881,8 +927,8 @@ export function DoneStep() {
           </li>
         ) : null}
         {reader && draft.following.length ? (
-          <li>
-            <Icon name="user" size={20} />
+          <li className="flex items-start gap-2.5">
+            <Icon name="user" size={20} className="mt-0.5 shrink-0 text-tag-red" />
             <span>
               Subscribing to {draft.following.length}{" "}
               {draft.following.length === 1 ? "writer" : "writers"}.
@@ -890,8 +936,8 @@ export function DoneStep() {
           </li>
         ) : null}
         {writer ? (
-          <li>
-            <Icon name="studio" size={20} />
+          <li className="flex items-start gap-2.5">
+            <Icon name="studio" size={20} className="mt-0.5 shrink-0 text-tag-red" />
             <span>
               Your Studio is ready.{" "}
               {draft.payout.method === "mpesa"
@@ -902,20 +948,20 @@ export function DoneStep() {
         ) : null}
       </ul>
       {error ? (
-        <p className="ob-error" role="alert">
+        <p className={errorText} role="alert">
           {error}
         </p>
       ) : null}
-      <div className="ob-actions">
+      <div className={cn(actions, "w-full")}>
         {reader ? (
-          <button type="button" className="btn btn-primary btn-block" disabled={saving} onClick={() => void finish("/")}>
+          <button type="button" className={primary} disabled={saving} onClick={() => void finish("/")}>
             {saving ? "Saving…" : "See today's joke"}
           </button>
         ) : null}
         {writer ? (
           <button
             type="button"
-            className={`btn btn-block ${reader ? "btn-quiet" : "btn-primary"}`}
+            className={reader ? secondary : primary}
             disabled={saving}
             onClick={() => void finish("/create")}
           >
@@ -923,7 +969,7 @@ export function DoneStep() {
           </button>
         ) : null}
       </div>
-      <p className="ob-small">You can switch between reading and writing any time in your profile.</p>
+      <p className={small}>You can switch between reading and writing any time in your profile.</p>
     </section>
   );
 }

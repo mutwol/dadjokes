@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import type React from "react";
 import { Link, useNavigate } from "react-router";
 import { api, unwrap } from "../api/client.ts";
 import type { Creator, DeliveryCard, Joke, Today as TodayData } from "../api/client.ts";
@@ -11,7 +12,20 @@ import { longDate, weekdayShort } from "../data/dates.ts";
 import { faceOf } from "../data/face.ts";
 import { REACTIONS, compact, groanScore } from "../data/reactions.ts";
 import { useStore } from "../state/useStore.ts";
-import "./Today.css";
+import { Card, DotBadge, TONE, button, cn, field, iconButton, skeleton } from "../components/ui/index.ts";
+
+const nameLine = "leading-[1.25] font-extrabold";
+const subLine = "text-sm text-ink-soft";
+
+/** A dashed box for "no joke right now" states. */
+function TodayEmpty({ title, children, role }: { title: string; children: React.ReactNode; role?: "alert" }) {
+  return (
+    <div className="grid gap-1.5 rounded-3xl border-2 border-dashed border-line-strong px-6 py-8" role={role}>
+      <p className="text-xl font-extrabold">{title}</p>
+      {children}
+    </div>
+  );
+}
 
 export function Today() {
   const { account, hasRole, setRole, showToast, unread } = useStore();
@@ -51,35 +65,35 @@ export function Today() {
   const reader = hasRole("reader");
 
   return (
-    <div className="today">
-      <header className="today-top">
+    <div className="mx-auto max-w-wide px-4 lg:px-8">
+      <header className="flex items-center justify-between pt-3.5 pb-1.5 lg:hidden">
         <NameTag name="Daddy Jokes" size="s" />
         <Link
           to="/activity"
-          className="icon-btn today-bell"
+          className={iconButton("ink", "relative")}
           aria-label={unread ? `Activity, ${unread} new` : "Activity"}
         >
           <Icon name="bell" />
-          {unread ? <span className="badge-dot" aria-hidden="true" /> : null}
+          {unread ? <DotBadge /> : null}
         </Link>
       </header>
 
-      <div className="today-grid">
-        <section className="today-main" aria-labelledby="today-title" aria-busy={!today && !failed}>
-          <p className="today-hi">Hi {account?.name?.split(" ")[0] ?? "there"}, I'm Dad.</p>
-          <h1 id="today-title" className="today-title">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-10 lg:pt-9">
+        <section className="grid min-w-0 gap-4.5" aria-labelledby="today-title" aria-busy={!today && !failed}>
+          <p className="mt-2 origin-left -rotate-[1.5deg] font-marker text-xl text-tag-red">Hi {account?.name?.split(" ")[0] ?? "there"}, I'm Dad.</p>
+          <h1 id="today-title" className="-mt-2.5 text-3xl">
             {today ? longDate(today.date) : "\u00a0"}
           </h1>
 
           {reader ? null : (
-            <div className="today-banner">
-              <p>
+            <div className="flex items-center gap-3 rounded-2xl border border-cream-edge bg-cream px-4 py-3.5">
+              <p className="flex-1 text-sm">
                 <strong>You're not getting the daily joke.</strong> Turn it on to get one at your chosen
                 time.
               </p>
               <button
                 type="button"
-                className="btn btn-primary btn-small"
+                className={button({ size: "sm" })}
                 onClick={() => {
                   void setRole("reader", true)
                     .then(() => {
@@ -95,12 +109,15 @@ export function Today() {
           )}
 
           {failed ? (
-            <div className="today-empty" role="alert">
-              <p>Couldn't load today's joke.</p>
-              <button type="button" className="btn btn-quiet btn-small" onClick={reload}>
+            <TodayEmpty role="alert" title="Couldn't load today's joke.">
+              <button
+                type="button"
+                className={button({ variant: "quiet", size: "sm" })}
+                onClick={reload}
+              >
                 Try again
               </button>
-            </div>
+            </TodayEmpty>
           ) : today ? (
             <>
               <WeekRail today={today} />
@@ -109,33 +126,28 @@ export function Today() {
               ) : today.current?.state === "opened" && today.current.jokeId ? (
                 <OpenedJoke jokeId={today.current.jokeId} />
               ) : today.current?.state === "missed" ? (
-                <div className="today-empty">
-                  <p>Today's joke disappeared before you opened it.</p>
+                <TodayEmpty title="Today's joke disappeared before you opened it.">
                   <p>Tomorrow's arrives at {formatHour(today.deliveryHour)}. Open it within a day to keep it.</p>
-                </div>
+                </TodayEmpty>
               ) : reader ? (
-                <div className="today-empty">
-                  {today.week.find((d) => d.date === today.date)?.state === "upcoming" ? (
-                    <>
-                      <p>Today's joke is still in the oven.</p>
-                      <p>It lands at {formatHour(today.deliveryHour)}.</p>
-                    </>
-                  ) : (
-                    <>
-                      <p>No joke for you today.</p>
-                      <p>The curators didn't pick one for today. Back tomorrow at {formatHour(today.deliveryHour)}.</p>
-                    </>
-                  )}
-                </div>
+                today.week.find((d) => d.date === today.date)?.state === "upcoming" ? (
+                  <TodayEmpty title="Today's joke is still in the oven.">
+                    <p>It lands at {formatHour(today.deliveryHour)}.</p>
+                  </TodayEmpty>
+                ) : (
+                  <TodayEmpty title="No joke for you today.">
+                    <p>The curators didn't pick one for today. Back tomorrow at {formatHour(today.deliveryHour)}.</p>
+                  </TodayEmpty>
+                )
               ) : null}
               {reader ? <NextDelivery today={today} /> : null}
             </>
           ) : (
-            <div className="today-skeleton" />
+            <div className={cn(skeleton, "min-h-80")} />
           )}
         </section>
 
-        <aside className="today-aside" aria-label="More">
+        <aside className="grid content-start gap-4 lg:sticky lg:top-9" aria-label="More">
           {today && reader ? <StreakCard today={today} /> : null}
           <CreatorsCard />
         </aside>
@@ -149,11 +161,17 @@ function WeekRail({ today }: { today: TodayData }) {
   const navigate = useNavigate();
 
   return (
-    <ol className="week" aria-label="This week">
+    <ol className="m-0 grid list-none grid-cols-[repeat(7,minmax(44px,1fr))] gap-1 p-0 pt-0.5 pb-1" aria-label="This week">
       {today.week.map((day) => {
         const isToday = day.date === today.date;
-        // The styles know new (sealed), seen (opened), missed and future.
-        const look = { sealed: "new", opened: "seen", missed: "missed", upcoming: "future", none: "missed" }[day.state];
+        // Rings: red and glowing when new, solid grey once seen, dashed when missed, dotted ahead.
+        const ring = {
+          sealed: "border-tag-red shadow-[0_0_0_3px_rgb(226_59_59/0.18)] max-xs:border-3",
+          opened: "",
+          missed: "border-dashed",
+          none: "border-dashed",
+          upcoming: "border-dotted bg-transparent",
+        }[day.state];
         const label = weekdayShort(day.date);
         const fullDay = new Date(`${day.date}T12:00:00`).toLocaleDateString("en-GB", { weekday: "long" });
 
@@ -177,20 +195,26 @@ function WeekRail({ today }: { today: TodayData }) {
           <li key={day.date}>
             <button
               type="button"
-              className={`week-day is-${look}${isToday ? " is-today" : ""}`}
+              className="flex w-full flex-col items-center gap-1.5 rounded-2xl border-0 bg-transparent py-1"
               onClick={onClick}
               aria-label={`${label}, ${description}`}
             >
-              <span className="week-ring">
+              <span
+                className={cn(
+                  "grid size-13.5 place-items-center rounded-full border-3 border-line-strong bg-paper p-0.5 text-ink-faint",
+                  "max-xs:size-11 max-xs:border-2 max-xs:p-px max-xs:[--avatar-size:36px]",
+                  ring,
+                )}
+              >
                 {day.state === "missed" ? (
                   <Icon name="lock" size={18} />
                 ) : day.creator ? (
                   <Avatar name={day.creator.name} tone={day.creator.tone} size={44} />
                 ) : (
-                  <span className="week-num">{Number(day.date.slice(8))}</span>
+                  <span className="text-base font-extrabold">{Number(day.date.slice(8))}</span>
                 )}
               </span>
-              <span className="week-label">{isToday ? "Today" : label}</span>
+              <span className={cn("text-xs font-bold", isToday ? "text-ink" : "text-ink-faint")}>{isToday ? "Today" : label}</span>
             </button>
           </li>
         );
@@ -202,15 +226,22 @@ function WeekRail({ today }: { today: TodayData }) {
 function SealedJoke({ card }: { card: DeliveryCard }) {
   const left = useTimeLeft(card.expiresAt);
   const first = card.creator.name.split(" ")[0];
+  const bg = card.kind === "text" ? card.background : "navy";
 
   return (
-    <div className={`sealed story-bg-${card.kind === "text" ? card.background : "navy"}`}>
+    <div className={cn("grid min-h-[340px] content-between justify-items-start gap-5.5 rounded-3xl px-6 pt-7 pb-6", TONE[bg])}>
       <NameTag name={first} size="l" tilt={-5} />
-      <div className="sealed-copy">
-        <h2>{first} picked today's joke for you.</h2>
-        <p>You can open it once. It disappears in {left}.</p>
+      <div className="grid max-w-[28ch] gap-2">
+        <h2 className="text-2xl">{first} picked today's joke for you.</h2>
+        <p className="opacity-90">You can open it once. It disappears in {left}.</p>
       </div>
-      <Link to={`/view/${card.date}`} className="btn sealed-open">
+      <Link
+        to={`/view/${card.date}`}
+        className={button({
+          variant: bg === "yellow" ? "dark" : "light",
+          className: "min-h-13 justify-self-stretch px-6 text-xl sm:justify-self-start",
+        })}
+      >
         Open today's joke
       </Link>
     </div>
@@ -233,43 +264,43 @@ function OpenedJoke({ jokeId }: { jokeId: string }) {
     };
   }, [jokeId]);
 
-  if (!joke) return <div className="today-skeleton" aria-busy="true" />;
+  if (!joke) return <div className={cn(skeleton, "min-h-80")} aria-busy="true" />;
   const counts = joke.stats.reactions;
   const mineMeta = REACTIONS.find((r) => r.kind === joke.myReaction);
 
   return (
-    <article className="opened">
-      <Link to={`/joke/${joke.id}`} className="opened-card" aria-label="See reactions and comments">
+    <article className="grid gap-4.5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:items-start">
+      <Link to={`/joke/${joke.id}`} className="block rounded-3xl no-underline" aria-label="See reactions and comments">
         <StoryCard face={faceOf(joke)} revealed variant="inline" animate={false} />
       </Link>
-      <div className="opened-meta">
-        <div className="byline">
+      <div className="grid gap-3.5">
+        <div className="flex items-center gap-2.5">
           <Avatar name={joke.creator.name} tone={joke.creator.tone} size={36} />
           <div>
-            <p className="byline-name">{joke.creator.name}</p>
-            <p className="byline-sub">@{joke.creator.handle}</p>
+            <p className={nameLine}>{joke.creator.name}</p>
+            <p className={subLine}>@{joke.creator.handle}</p>
           </div>
         </div>
-        <ul className="opened-stats">
+        <ul className="m-0 flex list-none flex-wrap gap-x-4.5 gap-y-1.5 p-0 text-ink-soft">
           <li>
-            <strong>{groanScore(counts)}</strong> groan score
+            <strong className="text-ink">{groanScore(counts)}</strong> groan score
           </li>
           <li>
-            <strong>{compact(joke.stats.views)}</strong> views
+            <strong className="text-ink">{compact(joke.stats.views)}</strong> views
           </li>
           <li>
-            <strong>{joke.stats.comments}</strong> comments
+            <strong className="text-ink">{joke.stats.comments}</strong> comments
           </li>
         </ul>
-        <p className="opened-mine">
+        <p className="font-bold">
           {mineMeta ? `You reacted ${mineMeta.emoji} ${mineMeta.label}` : "You haven't reacted yet."}
         </p>
-        <div className="opened-actions">
-          <Link to={`/joke/${joke.id}`} className="btn btn-primary">
+        <div className="flex flex-wrap gap-2.5">
+          <Link to={`/joke/${joke.id}`} className={button()}>
             <Icon name="comment" size={20} />
             Reactions and comments
           </Link>
-          <Link to={`/view/${joke.id}`} className="btn btn-quiet">
+          <Link to={`/view/${joke.id}`} className={button({ variant: "quiet" })}>
             <Icon name="replay" size={20} />
             Replay
           </Link>
@@ -283,14 +314,15 @@ function NextDelivery({ today }: { today: TodayData }) {
   const { setDeliveryHour, showToast } = useStore();
   const left = useTimeLeft(today.nextDeliveryAt);
   return (
-    <div className="next">
+    <Card className="flex items-center gap-3 px-4 py-3.5 text-ink-soft">
       <Icon name="clock" />
-      <p>
-        Your next joke arrives at <strong>{formatHour(today.deliveryHour)}</strong>, in {left}.
+      <p className="flex-1">
+        Your next joke arrives at <strong className="text-ink">{formatHour(today.deliveryHour)}</strong>, in {left}.
       </p>
-      <label className="next-select">
-        <span className="visually-hidden">Delivery time</span>
+      <label>
+        <span className="sr-only">Delivery time</span>
         <select
+          className={field("pill")}
           value={today.deliveryHour}
           onChange={(e) => {
             const h = Number(e.target.value);
@@ -307,7 +339,7 @@ function NextDelivery({ today }: { today: TodayData }) {
             ))}
         </select>
       </label>
-    </div>
+    </Card>
   );
 }
 
@@ -315,11 +347,11 @@ function StreakCard({ today }: { today: TodayData }) {
   const opened = today.current?.state === "opened";
   const sealed = today.current?.state === "sealed";
   return (
-    <section className="panel streak">
-      <p className="streak-num">{today.streak}</p>
+    <Card as="section" className="flex items-center gap-3.5 p-4.5">
+      <p className="font-marker text-4xl leading-none text-tag-red">{today.streak}</p>
       <div>
-        <h2 className="panel-title">day streak</h2>
-        <p className="panel-sub">
+        <h2 className="text-base">day streak</h2>
+        <p className={subLine}>
           {opened
             ? "Back tomorrow to keep it going."
             : sealed
@@ -327,7 +359,7 @@ function StreakCard({ today }: { today: TodayData }) {
               : "Open each day's joke to build a streak."}
         </p>
       </div>
-    </section>
+    </Card>
   );
 }
 
@@ -371,21 +403,21 @@ function CreatorsCard() {
 
   if (writers !== null && !writers.length) return null;
   return (
-    <section className="panel">
-      <h2 className="panel-title">Most groaned at this month</h2>
-      <ul className="creator-list" aria-busy={writers === null}>
+    <Card as="section" className="p-4.5">
+      <h2 className="text-base">Most groaned at this month</h2>
+      <ul className="m-0 mt-3 grid list-none gap-3 p-0" aria-busy={writers === null}>
         {(writers ?? []).map((c) => (
-          <li key={c.id}>
+          <li key={c.id} className="flex items-center gap-2.5">
             <Avatar name={c.name} tone={c.tone} size={36} />
-            <div className="creator-list-text">
-              <p className="byline-name">{c.name}</p>
-              <p className="byline-sub">
+            <div className="min-w-0 flex-1">
+              <p className={cn(nameLine, "truncate")}>{c.name}</p>
+              <p className={subLine}>
                 {compact(c.subscriberCount)} {c.subscriberCount === 1 ? "subscriber" : "subscribers"}
               </p>
             </div>
             <button
               type="button"
-              className="btn btn-quiet btn-small"
+              className={button({ variant: "quiet", size: "sm" })}
               aria-pressed={c.isSubscribed}
               aria-label={`${c.isSubscribed ? "Unsubscribe from" : "Subscribe to"} ${c.name}`}
               onClick={() => void toggle(c)}
@@ -396,6 +428,6 @@ function CreatorsCard() {
           </li>
         ))}
       </ul>
-    </section>
+    </Card>
   );
 }
