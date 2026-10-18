@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { EventsService } from "../platform/events.service";
 import { and, asc, desc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { AppError, notFound } from "../common/errors";
@@ -29,6 +30,7 @@ export class CreatorsService {
   constructor(
     @InjectDb() private readonly db: Db,
     private readonly notifications: NotificationsService,
+    private readonly events: EventsService,
   ) {}
 
   /** Writers who finished onboarding, with counts relative to the viewer. */
@@ -116,6 +118,7 @@ export class CreatorsService {
       .returning({ creatorId: subscriptions.creatorId });
     // Once per subscriber, even if they unsubscribe and come back.
     for (const a of added) {
+      await this.events.emit({ type: "subscription.created", userId, payload: { creatorId: a.creatorId } }, tx);
       await this.notifications.notify(
         { userId: a.creatorId, type: "new_subscriber", actorId: userId, dedupeKey: `subscriber:${userId}` },
         tx,

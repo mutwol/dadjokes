@@ -3,7 +3,35 @@ import { ApiError, createApiClient, unwrap } from "@daddy-jokes/contracts";
 export { ApiError, unwrap };
 export type {
   Activity,
+  AdminEngagement,
+  AdminFinance,
+  AdminOverview,
+  AdminUserDetail,
+  AdminUserRow,
+  Appeal,
+  AuditEntry,
+  AutomationCatalog,
+  AutomationStats,
   Balance,
+  DecisionPoint,
+  Landing,
+  ReportReceipt,
+  Rule,
+  RuleCondition,
+  RuleDefinition,
+  RuleEvaluation,
+  RuleGroup,
+  RuleOutcome,
+  RuleSetDetail,
+  RuleSetSummary,
+  RuleTestCase,
+  RuleTestReport,
+  WorkflowDetail,
+  WorkflowGraph,
+  WorkflowRun,
+  WorkflowRunDetail,
+  WorkflowStep,
+  WorkflowSummary,
   Comment,
   CompleteOnboardingRequest,
   CreateJokeRequest,
@@ -69,9 +97,8 @@ export const api = createApiClient({
   onUnauthorized: refreshAccessToken,
 });
 
-/** The message to show for a failed call: the API's own title when there is one. */
-export function errorMessage(err: unknown, fallback = "Something went wrong. Try again."): string {
-  if (err instanceof ApiError) return err.problem.title;
-  if (err instanceof TypeError) return "Can't reach Daddy Jokes. Check your connection and try again.";
-  return fallback;
-}
+/*
+ * Screens use RTK Query (./rtk) for data. This fetch client remains for the session
+ * itself (refresh, logout) and for streaming and file downloads; show errors with
+ * `problemMessage` from ./rtk.
+ */

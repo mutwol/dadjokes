@@ -1,19 +1,20 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { FormEvent, PointerEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { ApiError, api, errorMessage, unwrap } from "../api/client.ts";
-import type { Joke } from "../api/client.ts";
-import { recordEvent, toggleReaction } from "../api/engagement.ts";
-import { Icon } from "../components/Icon.tsx";
+import { is, problemMessage, useAddCommentMutation, useGetJokeQuery, useOpenDeliveryMutation } from "../api/rtk/index.ts";
+import type { Joke } from "../api/rtk/index.ts";
+import { recordEvent, useToggleReaction } from "../api/engagement.ts";
+import { IconButton } from "@/components/ui/button.tsx";
+import { Icon } from "@/components/ui/icon.tsx";
+import { toast } from "@/components/ui/toast.tsx";
+import { cn } from "@/lib/utils.ts";
 import { NameTag } from "../components/NameTag.tsx";
 import { ReactionBar } from "../components/Reactions.tsx";
 import { StoryCard } from "../components/StoryCard.tsx";
 import { shortDate } from "../data/dates.ts";
 import { faceOf } from "../data/face.ts";
-import { useStore } from "../state/useStore.ts";
-import { IconButton, Toast, cn } from "../components/ui/index.ts";
 
-const viewer = "fixed inset-0 z-50 grid animate-viewer-in place-items-center bg-ink";
+const viewer = "fixed inset-0 z-50 grid animate-viewer-in place-items-center bg-navy";
 
 /** How long each part stays up before moving on, in ms. */
 const SETUP_MS = 5000;
@@ -33,30 +34,26 @@ const IS_DATE = /^\d{4}-\d{2}-\d{2}$/;
 export function StoryViewer() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
-  const { showToast } = useStore();
-  const [joke, setJoke] = useState<Joke | null>(null);
+  const isDate = IS_DATE.test(id);
+  // A date opens that day's delivery (a write: it marks it opened); an id replays a joke.
+  const replay = useGetJokeQuery({ id }, { skip: isDate || !id });
+  const [openDelivery, delivery] = useOpenDeliveryMutation();
+  useEffect(() => {
+    if (isDate) void openDelivery({ date: id });
+  }, [isDate, id, openDelivery]);
+  const joke = isDate ? delivery.data : replay.data;
+  const error = isDate ? delivery.error : replay.error;
 
   useEffect(() => {
-    let cancelled = false;
-    const load = IS_DATE.test(id)
-      ? api.POST("/v1/me/deliveries/{date}/open", { params: { path: { date: id } } })
-      : api.GET("/v1/jokes/{id}", { params: { path: { id } } });
-    load.then(unwrap).then(
-      (j) => {
-        if (cancelled) return;
-        setJoke(j);
-        if (!IS_DATE.test(id)) recordEvent(j.id, "replay");
-      },
-      (e: unknown) => {
-        if (cancelled) return;
-        showToast(e instanceof ApiError && e.status === 410 ? e.problem.title : "That joke isn't available.");
-        void navigate("/", { replace: true });
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [id, navigate, showToast]);
+    if (!error) return;
+    toast.error(is(error, 410) ? problemMessage(error) : "That joke isn't available.");
+    void navigate("/", { replace: true });
+  }, [error, navigate]);
+
+  const replayId = isDate ? undefined : replay.data?.id;
+  useEffect(() => {
+    if (replayId) recordEvent(replayId, "replay");
+  }, [replayId]);
 
   if (!joke) return <div className={viewer} role="dialog" aria-modal="true" aria-label="Opening the joke" aria-busy="true" />;
   return <Viewer key={joke.id} joke={joke} />;
@@ -65,8 +62,9 @@ export function StoryViewer() {
 function Viewer({ joke }: { joke: Joke }) {
   const creator = joke.creator;
   const navigate = useNavigate();
-  const { showToast, toast } = useStore();
   const [myReaction, setMyReaction] = useState(joke.myReaction);
+  const toggleReaction = useToggleReaction();
+  const [addComment, replying] = useAddCommentMutation();
 
   // Image jokes are a single slide; text jokes are setup, then punchline.
   const steps = joke.kind === "text" ? 2 : 1;
@@ -131,7 +129,7 @@ function Viewer({ joke }: { joke: Joke }) {
     try {
       setMyReaction((await toggleReaction(joke.id, myReaction, kind)).myReaction);
     } catch (e) {
-      showToast(errorMessage(e));
+      toast.error(problemMessage(e));
     }
   };
 
@@ -139,13 +137,13 @@ function Viewer({ joke }: { joke: Joke }) {
   const sendReply = async (e: FormEvent) => {
     e.preventDefault();
     const body = reply.trim();
-    if (!body) return;
+    if (!body || replying.isLoading) return;
     try {
-      unwrap(await api.POST("/v1/jokes/{id}/comments", { params: { path: { id: joke.id } }, body: { body } }));
+      await addComment({ id: joke.id, createCommentRequest: { body } }).unwrap();
       setReply("");
-      showToast(`Reply sent to ${creator.name.split(" ")[0]}`);
+      toast.success(`Reply sent to ${creator.name.split(" ")[0]}`);
     } catch (err) {
-      showToast(errorMessage(err));
+      toast.error(problemMessage(err));
     }
   };
 
@@ -184,7 +182,7 @@ function Viewer({ joke }: { joke: Joke }) {
           </div>
           <div className="flex items-center gap-3">
             <NameTag name={creator.name.split(" ")[0]} size="s" tilt={-4} />
-            <p className="flex-1 text-sm font-bold [text-shadow:0_1px_2px_rgb(0_0_0/0.3)]">
+            <p className="flex-1 text-sm font-medium [text-shadow:0_1px_2px_rgb(0_0_0/0.3)]">
               {joke.deliverOn ? shortDate(joke.deliverOn) : "Preview"}
               <span className="sr-only">, from {creator.name}</span>
             </p>
@@ -213,11 +211,11 @@ function Viewer({ joke }: { joke: Joke }) {
             : joke.caption}
         </p>
 
-        <div className="absolute inset-x-0 bottom-0 z-3 grid gap-2.5 bg-linear-to-b from-transparent to-black/28 px-3 pt-10 pb-[calc(14px+env(safe-area-inset-bottom))]">
+        <div className="@container absolute inset-x-0 bottom-0 z-3 grid grid-cols-[minmax(0,1fr)] gap-2 bg-linear-to-b from-transparent to-black/28 px-3 pt-10 pb-[calc(14px+env(safe-area-inset-bottom))]">
           {!revealed ? (
             <button
               type="button"
-              className="min-h-11 justify-self-center rounded-full border-0 bg-white/18 px-5 font-bold text-white backdrop-blur-sm"
+              className="min-h-11 justify-self-center rounded-full border-0 bg-white/18 px-5 font-medium text-white backdrop-blur-sm"
               onClick={next}
             >
               {reduced ? "Tap for the punchline" : "Wait for it…"}
@@ -227,8 +225,8 @@ function Viewer({ joke }: { joke: Joke }) {
               {joke.isMine ? null : (
                 <ReactionBar tone="dark" selected={myReaction ?? undefined} onReact={(k) => void react(k)} />
               )}
-              <div className="flex gap-2">
-                <form className="flex min-h-12 flex-1 items-center rounded-full border-2 border-white/55 bg-black/12 pr-1 pl-4 text-white focus-within:border-white" onSubmit={(e) => void sendReply(e)}>
+              <div className="flex min-w-0 gap-2">
+                <form className="flex min-h-11 min-w-0 flex-1 items-center rounded-full border-2 border-white/55 bg-black/12 pr-1 pl-4 text-white focus-within:border-white" onSubmit={(e) => void sendReply(e)}>
                   <label className="sr-only" htmlFor="reply">
                     Reply to {creator.name}
                   </label>
@@ -244,24 +242,23 @@ function Viewer({ joke }: { joke: Joke }) {
                   />
                   <button
                     type="submit"
-                    className="grid size-10 place-items-center rounded-full border-0 bg-white text-ink disabled:cursor-default disabled:bg-transparent disabled:text-white/60"
+                    className="grid size-9 shrink-0 place-items-center theme-light rounded-full border-0 bg-white text-ink disabled:cursor-default disabled:bg-transparent disabled:text-white/60"
                     aria-label="Send reply"
-                    disabled={!reply.trim()}
+                    disabled={!reply.trim() || replying.isLoading}
                   >
                     <Icon name="send" size={20} />
                   </button>
                 </form>
-                <Link to={`/joke/${joke.id}`} className="flex min-w-12 shrink-0 items-center justify-center gap-1.5 rounded-full bg-white px-3.5 font-bold text-ink no-underline"
+                <Link to={`/joke/${joke.id}`} className="flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 theme-light rounded-full bg-white px-3 font-medium text-ink no-underline @max-[22rem]:px-0"
                   aria-label="Comments"
                 >
                   <Icon name="comment" size={20} />
-                  <span className="max-sm:hidden">Comments</span>
+                  <span className="@max-[22rem]:sr-only">Comments</span>
                 </Link>
               </div>
             </>
           )}
         </div>
-        {toast ? <Toast placement="viewer">{toast}</Toast> : null}
       </div>
     </div>
   );

@@ -2,7 +2,9 @@ import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
+import { AdminModule } from "./admin/admin.module";
 import { AuthModule } from "./auth/auth.module";
+import { AutomationModule } from "./automation/automation.module";
 import { AppConfig, AppConfigModule } from "./config/config.module";
 import { CreatorsModule } from "./creators/creators.module";
 import { DbModule } from "./db/db.module";
@@ -15,6 +17,9 @@ import { PaymentsModule } from "./payments/payments.module";
 import { StorageModule } from "./storage/storage.module";
 import { HealthController } from "./health/health.controller";
 import { MailModule } from "./mail/mail.module";
+import { ModerationModule } from "./moderation/moderation.module";
+import { PlatformModule } from "./platform/platform.module";
+import { RulesModule } from "./rules/rules.module";
 import { UsersModule } from "./users/users.module";
 
 /** Redis connection shared by queues in the API and the worker. */
@@ -41,6 +46,7 @@ export const queueRoot = BullModule.forRootAsync({
   imports: [
     AppConfigModule,
     DbModule,
+    PlatformModule,
     queueRoot,
     ThrottlerModule.forRootAsync({
       inject: [AppConfig],
@@ -59,6 +65,10 @@ export const queueRoot = BullModule.forRootAsync({
     DeliveriesModule,
     EngagementModule,
     PaymentsModule,
+    RulesModule,
+    ModerationModule,
+    AutomationModule,
+    AdminModule,
     AuthModule,
   ],
   controllers: [HealthController],

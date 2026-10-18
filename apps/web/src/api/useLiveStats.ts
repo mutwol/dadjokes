@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { apiUrl, getAccessToken, refreshAccessToken } from "./client.ts";
-import type { JokeStats } from "./client.ts";
+import type { JokeStats } from "./rtk/index.ts";
 
 /**
  * Live counts for a joke from GET /v1/jokes/:id/live (server-sent events,

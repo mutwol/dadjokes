@@ -1,6 +1,12 @@
 import type { ComponentPropsWithoutRef, ElementType } from "react";
-import { cn } from "./cn.ts";
-import { card, emptyState } from "./recipes.ts";
+import { cn } from "@/lib/utils.ts";
+
+/** The white, hairline-bordered surface used for panels, list items and settings groups. */
+export const card = "rounded-2xl border border-line bg-paper";
+
+/** A dashed placeholder box for "nothing here yet" states. */
+export const emptyState =
+  "grid justify-items-start gap-2.5 rounded-2xl border border-dashed border-line-strong p-6 text-ink-soft";
 
 type CardProps<T extends ElementType> = { as?: T } & ComponentPropsWithoutRef<T>;
 

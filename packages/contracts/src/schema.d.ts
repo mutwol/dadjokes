@@ -551,7 +551,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete my comment (curators: any comment) */
+        /** Delete my comment (admins: any comment) */
         delete: operations["deleteComment"];
         options?: never;
         head?: never;
@@ -616,10 +616,44 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Open reports, grouped by what was reported */
+        /** Open (or recently resolved) reports, grouped by what was reported */
         get: operations["listReports"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/curation/comments/{id}/hide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hide a comment from readers (curators and admins) */
+        post: operations["hideComment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/curation/comments/{id}/unhide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Show a hidden comment again (curators and admins) */
+        post: operations["unhideComment"];
         delete?: never;
         options?: never;
         head?: never;
@@ -635,8 +669,213 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Dismiss reports, or take the joke or comment down */
+        /** Dismiss reports, or take the joke or comment down (admins) */
         post: operations["resolveReports"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/decision-points": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Where the app asks rule sets for decisions, with their facts */
+        get: operations["listDecisionPoints"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every rule set */
+        get: operations["listRuleSets"];
+        put?: never;
+        /** Start a new rule set (an empty draft) */
+        post: operations["createRuleSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A rule set with its draft */
+        get: operations["getRuleSet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/rules/{id}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save the draft. Send the revision you loaded. */
+        put: operations["saveRuleDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/rules/{id}/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Try the draft (or live version) on some facts, with a trace */
+        post: operations["evaluateRuleSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/rules/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run the test cases against the draft (or unsaved edits) */
+        post: operations["testRuleSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/rules/{id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish the saved draft if every test passes */
+        post: operations["publishRuleSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/rules/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop using a rule set (system ones can't be archived) */
+        post: operations["archiveRuleSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/rules/{id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bring an archived rule set back */
+        post: operations["unarchiveRuleSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/rules/{id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Published versions, newest first */
+        get: operations["listRuleVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/rules/{id}/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One published version */
+        get: operations["getRuleVersion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/rules/{id}/versions/{version}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Copy an old version into the draft */
+        post: operations["restoreRuleVersion"];
         delete?: never;
         options?: never;
         head?: never;
@@ -650,10 +889,45 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Paid tips on a joke with their messages, newest first */
+        get: operations["listJokeTips"];
+        put?: never;
+        /** Tip the writer with M-Pesa, optionally with a short public message. The phone gets a PIN prompt; poll the tip for the result. */
+        post: operations["tipJoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tips/{id}/note-hidden": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Hide or show a tip's message (the joke's writer, or a curator) */
+        put: operations["setTipNoteHidden"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tips/{id}/simulate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
         get?: never;
         put?: never;
-        /** Tip the writer with M-Pesa. The phone gets a PIN prompt; poll the tip for the result. */
-        post: operations["tipJoke"];
+        /** Test mode only: answer the simulated M-Pesa prompt for my pending tip (404 when real M-Pesa is on) */
+        post: operations["simulateTipPrompt"];
         delete?: never;
         options?: never;
         head?: never;
@@ -706,6 +980,608 @@ export interface paths {
         put?: never;
         /** Withdraw tips to my M-Pesa */
         post: operations["requestPayout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/finance/fee-policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The platform's cut: the default rate and any per-writer rates, with history */
+        get: operations["listFeePolicies"];
+        put?: never;
+        /** Add a rate. It applies to tips paid from its start; earlier tips keep their rate. */
+        post: operations["createFeePolicy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/finance/reconciliations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent books checks, newest first */
+        get: operations["listReconciliations"];
+        put?: never;
+        /** Check the books now */
+        post: operations["runReconciliation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/finance/creator-fund": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Creator fund payouts, newest period first */
+        get: operations["listCreatorFundRuns"];
+        put?: never;
+        /** Pay the creator fund for a period into writers' pending balances */
+        post: operations["postCreatorFund"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/finance/creator-fund/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** How a pool would be split by qualified views. Changes nothing. */
+        post: operations["previewCreatorFund"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/jokes/{id}/appeal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask curators to look again at a joke of mine that was taken down */
+        post: operations["appealJoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/appeals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My appeals, newest first */
+        get: operations["listMyAppeals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/curation/appeals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Appeals from writers */
+        get: operations["listAppeals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/curation/appeals/{id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Keep the joke down, or put it back up */
+        post: operations["resolveAppeal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/automation/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Triggers, step types, templates and person facts for the editor */
+        get: operations["getAutomationCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/automation/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Queue health and activity in the last day */
+        get: operations["getAutomationStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/workflows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every workflow, last edited first */
+        get: operations["listWorkflows"];
+        put?: never;
+        /** A new workflow, empty or from a template */
+        post: operations["createWorkflow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/workflows/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A workflow with its draft */
+        get: operations["getWorkflow"];
+        put?: never;
+        post?: never;
+        /** Delete a paused or unpublished workflow and its runs */
+        delete: operations["deleteWorkflow"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/workflows/{id}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save the draft. Send the revision you loaded. */
+        put: operations["saveWorkflowDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/workflows/{id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check the saved draft, publish it and turn the workflow on */
+        post: operations["publishWorkflow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/workflows/{id}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop starting new runs (waiting runs still finish) */
+        post: operations["pauseWorkflow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/workflows/{id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start running the published version again */
+        post: operations["activateWorkflow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/workflows/{id}/discard-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Throw away unpublished edits */
+        post: operations["discardWorkflowDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/workflows/{id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Published versions, newest first */
+        get: operations["listWorkflowVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/workflows/{id}/versions/{version}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Copy an old version into the draft */
+        post: operations["restoreWorkflowVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/workflows/{id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent runs of one workflow */
+        get: operations["listWorkflowRuns"];
+        put?: never;
+        /** Run it now for one person: a test of the draft, or the live version */
+        post: operations["startWorkflowRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent runs of every workflow */
+        get: operations["listRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/runs/{runId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One run with every step it took */
+        get: operations["getRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Today at a glance: people, opens, streaks, queue, moderation, money */
+        get: operations["getAdminOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/finance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tips, fees, payouts and balances for a period */
+        get: operations["getAdminFinance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/finance/ledger.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every ledger entry in the period, as CSV */
+        get: operations["exportLedger"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/engagement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Opens, streaks, top jokes and reactions for a period */
+        get: operations["getAdminEngagement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** People, with search, filters and sorting (newest first by default) */
+        get: operations["listAdminUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One person: profile, stats, messages, runs and history */
+        get: operations["getAdminUser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users/{id}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set someone's roles */
+        put: operations["setAdminUserRoles"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users/{id}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Suspend an account and sign it out everywhere */
+        post: operations["suspendUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users/{id}/unsuspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lift a suspension */
+        post: operations["unsuspendUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users/{id}/tags/{tag}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Add a tag to someone */
+        put: operations["tagUser"];
+        post?: never;
+        /** Remove a tag from someone */
+        delete: operations["untagUser"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tags in use, most common first */
+        get: operations["listTags"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The audit log, newest first */
+        get: operations["listAudit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/landing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A favourite joke, headline numbers and popular writers for the landing page */
+        get: operations["getLanding"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -900,6 +1776,286 @@ export interface components {
         TopicList: {
             data: components["schemas"]["Topic"][];
         };
+        AdminOverview: {
+            people: {
+                total: number;
+                new7d: number;
+                readers: number;
+                writers: number;
+                suspended: number;
+            };
+            today: {
+                /** @description Jokes delivered in the last 24 hours. */
+                delivered: number;
+                opened: number;
+                /** @description Share of delivered jokes opened, last 7 days (0-1). */
+                openRate7d: number;
+            };
+            streaks: {
+                active3plus: number;
+                longest: number;
+            };
+            queue: {
+                inReview: number;
+                scheduledAhead: number;
+                /** @description Of the next 7 days. */
+                daysWithoutPick: number;
+            };
+            moderation: {
+                openReports: number;
+                hidden: number;
+                openAppeals: number;
+            };
+            money: {
+                tips24hKes: number;
+                tips30dKes: number;
+                fees30dKes: number;
+                owedToWritersKes: number;
+            };
+            series: {
+                /** Format: date */
+                date: string;
+                signups: number;
+                opens: number;
+                tipsKes: number;
+            }[];
+        };
+        AdminFinance: {
+            days: number;
+            totals: {
+                tipsKes: number;
+                tipCount: number;
+                feesKes: number;
+                writerEarningsKes: number;
+                payoutsPaidKes: number;
+                payoutsPendingKes: number;
+                payoutsFailed: number;
+                tipsFailed: number;
+                /** @description Every writer balance combined, now. */
+                owedToWritersKes: number;
+                /** @description Net money through M-Pesa: tips in minus payouts out, all time. */
+                clearingKes: number;
+            };
+            series: {
+                /** Format: date */
+                date: string;
+                tipsKes: number;
+                feesKes: number;
+                payoutsKes: number;
+            }[];
+            topWriters: {
+                /** Format: uuid */
+                id: string;
+                handle: string;
+                name: string;
+                tipsKes: number;
+                tips: number;
+                balanceKes: number;
+            }[];
+            payouts: {
+                /** Format: uuid */
+                id: string;
+                handle: string;
+                amountKes: number;
+                /** @enum {string} */
+                status: "requested" | "processing" | "paid" | "failed";
+                resultDesc: string | null;
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                completedAt: string | null;
+            }[];
+        };
+        AdminEngagement: {
+            days: number;
+            daily: {
+                /** Format: date */
+                date: string;
+                delivered: number;
+                opened: number;
+                reactions: number;
+                comments: number;
+            }[];
+            streakBuckets: {
+                label: string;
+                readers: number;
+            }[];
+            topStreaks: {
+                /** Format: uuid */
+                id: string;
+                handle: string;
+                name: string;
+                streak: number;
+            }[];
+            topJokes: {
+                /** Format: uuid */
+                id: string;
+                preview: string;
+                handle: string;
+                /** Format: date */
+                deliverOn: string | null;
+                opens: number;
+                reactions: number;
+                comments: number;
+                shares: number;
+            }[];
+            reactions: {
+                [key: string]: number;
+            };
+            automation: {
+                messages: number;
+                byChannel: {
+                    [key: string]: number;
+                };
+            };
+        };
+        AdminUserRow: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            handle: string | null;
+            email: string;
+            country: string | null;
+            /** @enum {string} */
+            tone: "red" | "navy" | "yellow" | "green" | "denim";
+            roles: ("reader" | "writer" | "curator" | "admin")[];
+            tags: string[];
+            streak: number;
+            /** Format: date-time */
+            lastOpenAt: string | null;
+            onboarded: boolean;
+            suspended: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AdminUserPage: {
+            data: components["schemas"]["AdminUserRow"][];
+            total: number;
+            page: number;
+            size: number;
+        };
+        AdminUserDetail: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            handle: string | null;
+            email: string;
+            country: string | null;
+            /** @enum {string} */
+            tone: "red" | "navy" | "yellow" | "green" | "denim";
+            roles: ("reader" | "writer" | "curator" | "admin")[];
+            tags: string[];
+            streak: number;
+            /** Format: date-time */
+            lastOpenAt: string | null;
+            onboarded: boolean;
+            suspended: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            bio: string;
+            timezone: string;
+            deliveryHour: number | null;
+            suspendedReason: string | null;
+            /** Format: date-time */
+            suspendedAt: string | null;
+            stats: {
+                opens: number;
+                missed7d: number;
+                subscriptions: number;
+                subscribers: number;
+                tipsSent: number;
+                tipsSentKes: number;
+                tipsReceivedKes: number;
+                balanceKes: number;
+                jokesSubmitted: number;
+                jokesDelivered: number;
+                jokesRemoved: number;
+                reportsAgainst: number;
+                reportsFiled: number;
+            };
+            messages: {
+                channel: string;
+                title: string;
+                workflowName: string | null;
+                /** Format: date-time */
+                sentAt: string;
+            }[];
+            runs: {
+                /** Format: uuid */
+                id: string;
+                workflowName: string;
+                status: string;
+                /** Format: date-time */
+                startedAt: string;
+            }[];
+            audit: {
+                action: string;
+                actor: string | null;
+                data: {
+                    [key: string]: unknown;
+                };
+                /** Format: date-time */
+                createdAt: string;
+            }[];
+        };
+        SetRolesRequest: {
+            roles: ("reader" | "writer" | "curator" | "admin")[];
+        };
+        SuspendRequest: {
+            reason: string;
+        };
+        TagList: {
+            data: {
+                tag: string;
+                people: number;
+            }[];
+        };
+        AuditEntry: {
+            /** Format: uuid */
+            id: string;
+            /** @description Null when the system did it. */
+            actor: {
+                /** Format: uuid */
+                id: string;
+                handle: string;
+            } | null;
+            action: string;
+            targetType: string;
+            targetId: string;
+            data: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AuditPage: {
+            data: components["schemas"]["AuditEntry"][];
+            /** Format: date-time */
+            nextBefore: string | null;
+        };
+        Landing: {
+            /** @description A recent favourite to show on the landing page. */
+            sample: {
+                setup: string;
+                punchline: string;
+                /** @enum {string} */
+                background: "red" | "navy" | "yellow" | "green" | "denim";
+                writer: string;
+            } | null;
+            stats: {
+                readers: number;
+                writers: number;
+                jokesDelivered: number;
+                reactions: number;
+            };
+            writers: {
+                name: string;
+                handle: string;
+                /** @enum {string} */
+                tone: "red" | "navy" | "yellow" | "green" | "denim";
+                subscribers: number;
+            }[];
+        };
         Creator: {
             /** Format: uuid */
             id: string;
@@ -942,6 +2098,501 @@ export interface components {
         AccessToken: {
             accessToken: string;
             expiresInSeconds: number;
+        };
+        RuleCondition: {
+            /** @enum {string} */
+            kind: "condition";
+            id: string;
+            field: string;
+            /** @enum {string} */
+            op: "eq" | "neq" | "gt" | "gte" | "lt" | "lte" | "between" | "in" | "not_in" | "contains" | "not_contains" | "starts_with" | "starts_with_any" | "ends_with" | "is_empty" | "is_not_empty" | "is_true" | "is_false";
+            /** @description A literal (number, text, true/false, a list), or { ref } to another fact. */
+            value?: unknown;
+        };
+        RuleGroup: {
+            /** @enum {string} */
+            kind: "group";
+            id: string;
+            /** @enum {string} */
+            match: "all" | "any" | "none";
+            items: (components["schemas"]["RuleCondition"] | components["schemas"]["RuleGroup"])[];
+        };
+        RuleOutcome: {
+            key: string;
+            value: unknown;
+        };
+        Rule: {
+            id: string;
+            /** @default  */
+            name?: string;
+            /** @default true */
+            enabled?: boolean;
+            when: components["schemas"]["RuleGroup"];
+            then: components["schemas"]["RuleOutcome"][];
+        };
+        RuleTestCase: {
+            id: string;
+            name: string;
+            facts: {
+                [key: string]: unknown;
+            };
+            /** @description Outputs that must come out, e.g. { hide: true }. */
+            expect: {
+                [key: string]: unknown;
+            };
+        };
+        RuleDefinition: {
+            /**
+             * @default first
+             * @enum {string}
+             */
+            hitPolicy?: "first" | "collect";
+            rules: components["schemas"]["Rule"][];
+            /** @default [] */
+            default?: components["schemas"]["RuleOutcome"][];
+            /** @default [] */
+            tests?: components["schemas"]["RuleTestCase"][];
+        };
+        DecisionPoint: {
+            key: string;
+            label: string;
+            description: string;
+            facts: {
+                path: string;
+                /** @enum {string} */
+                type: "number" | "text" | "boolean" | "list" | "date";
+                label: string;
+                example?: unknown;
+            }[];
+            outputs: {
+                key: string;
+                /** @enum {string} */
+                type: "number" | "text" | "boolean" | "list" | "date";
+                label: string;
+            }[];
+        };
+        DecisionPointList: {
+            data: components["schemas"]["DecisionPoint"][];
+        };
+        RuleSetSummary: {
+            /** Format: uuid */
+            id: string;
+            key: string;
+            name: string;
+            description: string;
+            decisionPoint: string;
+            /** @description Used by the app itself; can be edited but not archived. */
+            system: boolean;
+            /** @enum {string} */
+            status: "draft" | "published" | "archived";
+            /** @description 0 until first published. */
+            liveVersion: number;
+            ruleCount: number;
+            testCount: number;
+            hasUnpublishedChanges: boolean;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description Handle of whoever saved it last. */
+            updatedBy: string | null;
+        };
+        RuleSetList: {
+            data: components["schemas"]["RuleSetSummary"][];
+        };
+        RuleSetDetail: {
+            /** Format: uuid */
+            id: string;
+            key: string;
+            name: string;
+            description: string;
+            decisionPoint: string;
+            /** @description Used by the app itself; can be edited but not archived. */
+            system: boolean;
+            /** @enum {string} */
+            status: "draft" | "published" | "archived";
+            /** @description 0 until first published. */
+            liveVersion: number;
+            ruleCount: number;
+            testCount: number;
+            hasUnpublishedChanges: boolean;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description Handle of whoever saved it last. */
+            updatedBy: string | null;
+            /** @description Send it back when saving, so two people can't overwrite each other. */
+            revision: number;
+            draft: components["schemas"]["RuleDefinition"];
+        };
+        CreateRuleSetRequest: {
+            key: string;
+            name: string;
+            /** @default  */
+            description?: string;
+            decisionPoint: string;
+        };
+        UpdateRuleDraftRequest: {
+            revision: number;
+            name?: string;
+            description?: string;
+            draft: components["schemas"]["RuleDefinition"];
+        };
+        RuleEvaluation: {
+            /** @description The version evaluated; null for the draft. */
+            version: number | null;
+            matched: string[];
+            outputs: {
+                [key: string]: unknown;
+            };
+            usedDefault: boolean;
+            trace: {
+                ruleId: string;
+                name: string;
+                enabled: boolean;
+                matched: boolean;
+                conditions: {
+                    id: string;
+                    field: string;
+                    op: string;
+                    left: unknown;
+                    right: unknown;
+                    result: boolean;
+                }[];
+            }[];
+        };
+        EvaluateRuleSetRequest: {
+            facts: {
+                [key: string]: unknown;
+            };
+            /**
+             * @default draft
+             * @enum {string}
+             */
+            source?: "draft" | "live";
+            definition?: components["schemas"]["RuleDefinition"];
+        };
+        RuleTestReport: {
+            passed: boolean;
+            results: {
+                id: string;
+                name: string;
+                passed: boolean;
+                outputs: {
+                    [key: string]: unknown;
+                };
+                failures: {
+                    [key: string]: {
+                        expected: unknown;
+                        actual: unknown;
+                    };
+                };
+            }[];
+        };
+        RunRuleTestsRequest: {
+            definition?: components["schemas"]["RuleDefinition"];
+        };
+        RulePublishResult: {
+            /** @description False when a test failed; nothing changed then. */
+            published: boolean;
+            version: number | null;
+            tests: components["schemas"]["RuleTestReport"];
+        };
+        RuleVersionList: {
+            data: {
+                version: number;
+                /** Format: date-time */
+                publishedAt: string;
+                publishedBy: string | null;
+                ruleCount: number;
+            }[];
+        };
+        RuleVersion: {
+            version: number;
+            /** Format: date-time */
+            publishedAt: string;
+            publishedBy: string | null;
+            definition: components["schemas"]["RuleDefinition"];
+        };
+        FilterStep: {
+            id: string;
+            /** @enum {string} */
+            type: "filter";
+            /** @default  */
+            name?: string;
+            when: components["schemas"]["RuleGroup"];
+        };
+        DecisionStep: {
+            id: string;
+            /** @enum {string} */
+            type: "decision";
+            /** @default  */
+            name?: string;
+            ruleSetKey: string;
+            /**
+             * @description Stop the run when no rule matched (only the default applied).
+             * @default false
+             */
+            stopUnlessMatched?: boolean;
+        };
+        DelayStep: {
+            id: string;
+            /** @enum {string} */
+            type: "delay";
+            minutes: number;
+        };
+        WaitUntilHourStep: {
+            id: string;
+            /** @enum {string} */
+            type: "wait_until_hour";
+            hour: number;
+        };
+        SendPushStep: {
+            id: string;
+            /** @enum {string} */
+            type: "send_push";
+            title: string;
+            /** @default  */
+            body?: string;
+            /** @default / */
+            url?: string;
+        };
+        SendEmailStep: {
+            id: string;
+            /** @enum {string} */
+            type: "send_email";
+            subject: string;
+            body: string;
+        };
+        NotifyStep: {
+            id: string;
+            /** @enum {string} */
+            type: "notify";
+            title: string;
+            /** @default  */
+            body?: string;
+            /** @default / */
+            url?: string;
+        };
+        TagStep: {
+            id: string;
+            /** @enum {string} */
+            type: "add_tag" | "remove_tag";
+            tag: string;
+        };
+        AlertStaffStep: {
+            id: string;
+            /** @enum {string} */
+            type: "alert_staff";
+            title: string;
+            /** @default  */
+            body?: string;
+            /** @default /admin */
+            url?: string;
+        };
+        WorkflowStep: components["schemas"]["FilterStep"] | components["schemas"]["DecisionStep"] | components["schemas"]["DelayStep"] | components["schemas"]["WaitUntilHourStep"] | components["schemas"]["SendPushStep"] | components["schemas"]["SendEmailStep"] | components["schemas"]["NotifyStep"] | components["schemas"]["TagStep"] | components["schemas"]["AlertStaffStep"];
+        WorkflowGraph: {
+            trigger: {
+                /** @enum {string} */
+                type: "user.signed_up" | "delivery.opened" | "delivery.unopened" | "delivery.missed" | "streak.milestone" | "subscription.created" | "tip.paid" | "report.created" | "manual";
+                when?: components["schemas"]["RuleGroup"];
+            };
+            steps: components["schemas"]["WorkflowStep"][];
+        };
+        AutomationCatalog: {
+            triggers: {
+                type: string;
+                label: string;
+                fields: {
+                    name: string;
+                    /** @enum {string} */
+                    type: "number" | "text" | "boolean" | "list" | "date";
+                }[];
+            }[];
+            steps: {
+                type: string;
+                category: string;
+                label: string;
+                description: string;
+            }[];
+            templates: {
+                key: string;
+                name: string;
+                description: string;
+                triggerType: string;
+                stepCount: number;
+            }[];
+            userFacts: {
+                path: string;
+                /** @enum {string} */
+                type: "number" | "text" | "boolean" | "list" | "date";
+                label: string;
+            }[];
+        };
+        WorkflowSummary: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            description: string;
+            /** @enum {string} */
+            status: "draft" | "active" | "paused";
+            /** @description The draft's trigger. */
+            triggerType: string;
+            publishedVersion: number;
+            hasUnpublishedChanges: boolean;
+            stepCount: number;
+            runs7d: number;
+            failed7d: number;
+            /** Format: date-time */
+            lastRunAt: string | null;
+            /** Format: date-time */
+            updatedAt: string;
+            updatedBy: string | null;
+        };
+        WorkflowList: {
+            data: components["schemas"]["WorkflowSummary"][];
+        };
+        WorkflowDetail: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            description: string;
+            /** @enum {string} */
+            status: "draft" | "active" | "paused";
+            /** @description The draft's trigger. */
+            triggerType: string;
+            publishedVersion: number;
+            hasUnpublishedChanges: boolean;
+            stepCount: number;
+            runs7d: number;
+            failed7d: number;
+            /** Format: date-time */
+            lastRunAt: string | null;
+            /** Format: date-time */
+            updatedAt: string;
+            updatedBy: string | null;
+            revision: number;
+            draft: components["schemas"]["WorkflowGraph"];
+            liveTriggerType: string | null;
+        };
+        CreateWorkflowRequest: {
+            name: string;
+            /** @default  */
+            description?: string;
+            templateKey?: string;
+        };
+        UpdateWorkflowDraftRequest: {
+            revision: number;
+            name?: string;
+            description?: string;
+            draft: components["schemas"]["WorkflowGraph"];
+        };
+        WorkflowPublishResult: {
+            published: boolean;
+            version: number | null;
+            /** @description Why it couldn't be published. */
+            problems: string[];
+        };
+        WorkflowVersionList: {
+            data: {
+                version: number;
+                /** Format: date-time */
+                publishedAt: string;
+                publishedBy: string | null;
+                triggerType: string;
+                stepCount: number;
+            }[];
+        };
+        WorkflowRun: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            workflowId: string;
+            workflowName: string;
+            /** @description 0 for test runs of the draft. */
+            workflowVersion: number;
+            /** @enum {string} */
+            status: "running" | "waiting" | "completed" | "stopped" | "failed";
+            user: {
+                /** Format: uuid */
+                id: string;
+                handle: string;
+                name: string;
+            } | null;
+            eventType: string;
+            stepIndex: number;
+            /** Format: date-time */
+            resumeAt: string | null;
+            error: string | null;
+            test: boolean;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            finishedAt: string | null;
+        };
+        WorkflowRunList: {
+            data: components["schemas"]["WorkflowRun"][];
+        };
+        WorkflowRunDetail: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            workflowId: string;
+            workflowName: string;
+            /** @description 0 for test runs of the draft. */
+            workflowVersion: number;
+            /** @enum {string} */
+            status: "running" | "waiting" | "completed" | "stopped" | "failed";
+            user: {
+                /** Format: uuid */
+                id: string;
+                handle: string;
+                name: string;
+            } | null;
+            eventType: string;
+            stepIndex: number;
+            /** Format: date-time */
+            resumeAt: string | null;
+            error: string | null;
+            test: boolean;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            finishedAt: string | null;
+            event: {
+                [key: string]: unknown;
+            };
+            steps: {
+                stepIndex: number;
+                stepId: string;
+                type: string;
+                status: string;
+                output: unknown;
+                error: string | null;
+                /** Format: date-time */
+                at: string;
+            }[];
+        };
+        StartWorkflowRunRequest: {
+            /**
+             * Format: uuid
+             * @description Who to run it for. Defaults to you.
+             */
+            userId?: string;
+            /**
+             * @description test runs the draft and skips waits; live runs the published version.
+             * @default test
+             * @enum {string}
+             */
+            mode?: "test" | "live";
+        };
+        AutomationStats: {
+            pendingEvents: number;
+            waitingRuns: number;
+            runs24h: number;
+            failed24h: number;
+            messages24h: number;
+            skippedByPolicy24h: number;
+        };
+        Queued: {
+            queued: boolean;
         };
         CreateJokeRequest: {
             /** @enum {string} */
@@ -1149,7 +2800,12 @@ export interface components {
                 tone: "red" | "navy" | "yellow" | "green" | "denim";
             };
             isMine: boolean;
+            /** @description Authors can delete their own comments; admins any. */
             canDelete: boolean;
+            /** @description Curators and admins can hide a comment from readers. */
+            canHide: boolean;
+            /** @description Hidden from readers (only staff and the author see it). */
+            hidden: boolean;
         };
         CommentPage: {
             data: components["schemas"]["Comment"][];
@@ -1196,6 +2852,14 @@ export interface components {
             notes: string[];
             /** Format: date-time */
             firstReportedAt: string;
+            /** @description Hidden from readers automatically, waiting for a decision. */
+            hidden: boolean;
+            /** @enum {string|null} */
+            resolution: "dismissed" | "removed" | null;
+            /** Format: date-time */
+            resolvedAt: string | null;
+            /** @description Handle of the curator who decided. */
+            resolvedBy: string | null;
         };
         ReportedItemList: {
             data: components["schemas"]["ReportedItem"][];
@@ -1207,6 +2871,13 @@ export interface components {
             commentId?: string;
             /** @enum {string} */
             action: "dismiss" | "remove";
+            /** @description Why, for the audit log. */
+            note?: string;
+        };
+        ReportReceipt: {
+            alreadyReported: boolean;
+            /** @description It's now hidden from readers while curators review it. */
+            hidden: boolean;
         };
         EventsAccepted: {
             accepted: number;
@@ -1318,7 +2989,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            type: "joke_scheduled" | "joke_declined" | "joke_delivered" | "joke_removed" | "new_subscriber" | "comment" | "tip_received" | "payout_paid" | "payout_failed";
+            type: "joke_scheduled" | "joke_declined" | "joke_delivered" | "joke_removed" | "new_subscriber" | "comment" | "tip_received" | "payout_paid" | "payout_failed" | "report_resolved" | "appeal_resolved" | "automation";
             title: string;
             body: string | null;
             /** @description Where tapping it should go in the app. */
@@ -1358,6 +3029,10 @@ export interface components {
             amountKes: number;
             /** @description The M-Pesa number to charge. It gets a prompt to enter the PIN. */
             phone: string;
+            /** @description Shown with the tip under the joke and in the writer's notification. */
+            note?: string;
+            /** @description Hide my name on the joke and from the writer. */
+            anonymous?: boolean;
         };
         Tip: {
             /** Format: uuid */
@@ -1369,14 +3044,27 @@ export interface components {
             status: "pending" | "paid" | "failed" | "cancelled" | "expired";
             /** @description What to tell the tipper about the current status. */
             message: string;
+            /** @description Test mode: no real money moves. Answer the prompt with simulateTipPrompt. */
+            simulated: boolean;
+            phoneLast3: string;
             /** Format: date-time */
             createdAt: string;
         };
         Balance: {
             /** @description Can be withdrawn now. */
             availableKes: number;
+            /** @description Earned but still on hold; becomes available after the hold. */
+            pendingKes: number;
+            /**
+             * Format: date-time
+             * @description When the next pending earnings become available.
+             */
+            nextReleaseAt: string | null;
+            holdHours: number;
             /** @description Everything tipped to you, after the platform fee. */
             lifetimeTipsKes: number;
+            /** @description Everything paid to you from the creator fund. */
+            creatorFundKes: number;
             paidOutKes: number;
             pendingPayoutKes: number;
             minimumPayoutKes: number;
@@ -1400,6 +3088,147 @@ export interface components {
         PayoutList: {
             data: components["schemas"]["PayoutTransfer"][];
         };
+        TipWallItem: {
+            /** Format: uuid */
+            id: string;
+            amountKes: number;
+            note: string | null;
+            /** @description The writer or a curator hid the message. */
+            noteHidden: boolean;
+            anonymous: boolean;
+            isMine: boolean;
+            /** @description Null when the tipper chose to stay anonymous. */
+            from: {
+                name: string;
+                handle: string;
+                tone: string;
+            } | null;
+            /** Format: date-time */
+            paidAt: string;
+        };
+        TipWall: {
+            count: number;
+            totalKes: number;
+            /** @description The viewer can hide messages (the writer, or a curator). */
+            canModerate: boolean;
+            data: components["schemas"]["TipWallItem"][];
+        };
+        HideTipNoteRequest: {
+            hidden: boolean;
+        };
+        FeePolicy: {
+            /** Format: uuid */
+            id: string;
+            country: string;
+            creator: {
+                /** Format: uuid */
+                id: string;
+                handle: string | null;
+                name: string | null;
+            } | null;
+            /** @description Basis points: 1000 = 10%. */
+            bps: number;
+            note: string;
+            /** Format: date-time */
+            effectiveFrom: string;
+            /** Format: date-time */
+            supersededAt: string | null;
+            /** @description Paid tips charged at this rate. */
+            tips: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        FeePolicyList: {
+            data: components["schemas"]["FeePolicy"][];
+        };
+        CreateFeePolicyRequest: {
+            bps: number;
+            /** @description Leave out for the default rate; set for one writer's own rate. */
+            creatorHandle?: string;
+            /** @default  */
+            note?: string;
+            /**
+             * Format: date-time
+             * @description Defaults to now. Can't be in the past.
+             */
+            effectiveFrom?: string;
+        };
+        ReconciliationCheck: {
+            key: string;
+            label: string;
+            ok: boolean;
+            count: number;
+            amountKes: number | null;
+            detail: string | null;
+        };
+        ReconciliationRun: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            status: "ok" | "issues" | "failed";
+            checks: components["schemas"]["ReconciliationCheck"][];
+            /** @description Handle of the admin who ran it; null for the daily run. */
+            triggeredBy: string | null;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            finishedAt: string;
+        };
+        ReconciliationRunList: {
+            data: components["schemas"]["ReconciliationRun"][];
+        };
+        CreatorFundRequest: {
+            /** Format: date */
+            periodStart: string;
+            /** Format: date */
+            periodEnd: string;
+            poolKes: number;
+        };
+        CreatorFundAllocation: {
+            /** Format: uuid */
+            creatorId: string;
+            handle: string | null;
+            name: string | null;
+            views: number;
+            sharePct: number;
+            amountKes: number;
+        };
+        CreatorFundPreview: {
+            /** Format: date */
+            periodStart: string;
+            /** Format: date */
+            periodEnd: string;
+            poolKes: number;
+            /** @description Opens by readers other than the writer, of jokes still up, from writers in good standing. */
+            qualifiedViews: number;
+            allocations: components["schemas"]["CreatorFundAllocation"][];
+        };
+        CreatorFundRun: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            periodStart: string;
+            /** Format: date */
+            periodEnd: string;
+            poolKes: number;
+            allocatedKes: number;
+            qualifiedViews: number;
+            creators: number;
+            releasedKes: number;
+            createdBy: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CreatorFundRunList: {
+            data: components["schemas"]["CreatorFundRun"][];
+        };
+        SimulateTipPromptRequest: {
+            /**
+             * @description What the tipper does on the simulated M-Pesa prompt.
+             * @enum {string}
+             */
+            answer: "approve" | "cancel" | "insufficient_funds" | "wrong_pin";
+        };
         CreateUploadRequest: {
             /** @enum {string} */
             contentType: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
@@ -1417,6 +3246,38 @@ export interface components {
             };
             /** Format: date-time */
             expiresAt: string;
+        };
+        CreateAppealRequest: {
+            message: string;
+        };
+        Appeal: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            jokeId: string;
+            preview: string;
+            authorHandle: string;
+            message: string;
+            /** @enum {string} */
+            status: "open" | "upheld" | "overturned";
+            resolutionNote: string | null;
+            resolvedBy: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            resolvedAt: string | null;
+        };
+        AppealList: {
+            data: components["schemas"]["Appeal"][];
+        };
+        ResolveAppealRequest: {
+            /**
+             * @description uphold keeps it down; overturn puts it back up.
+             * @enum {string}
+             */
+            decision: "uphold" | "overturn";
+            /** @description Shown to the writer. */
+            note?: string;
         };
     };
     responses: never;
@@ -2503,12 +4364,14 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Received */
-            204: {
+            /** @description OK */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ReportReceipt"];
+                };
             };
         };
     };
@@ -2558,7 +4421,9 @@ export interface operations {
     };
     listReports: {
         parameters: {
-            query?: never;
+            query?: {
+                status?: "open" | "resolved";
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2573,6 +4438,46 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ReportedItemList"];
                 };
+            };
+        };
+    };
+    hideComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Hidden */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    unhideComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Shown */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -2595,6 +4500,344 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    listDecisionPoints: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionPointList"];
+                };
+            };
+        };
+    };
+    listRuleSets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleSetList"];
+                };
+            };
+        };
+    };
+    createRuleSet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRuleSetRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleSetDetail"];
+                };
+            };
+            /** @description Key taken */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getRuleSet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleSetDetail"];
+                };
+            };
+        };
+    };
+    saveRuleDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRuleDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleSetDetail"];
+                };
+            };
+            /** @description Someone else saved in between */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    evaluateRuleSet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvaluateRuleSetRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleEvaluation"];
+                };
+            };
+        };
+    };
+    testRuleSet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunRuleTestsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleTestReport"];
+                };
+            };
+        };
+    };
+    publishRuleSet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RulePublishResult"];
+                };
+            };
+        };
+    };
+    archiveRuleSet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleSetDetail"];
+                };
+            };
+        };
+    };
+    unarchiveRuleSet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleSetDetail"];
+                };
+            };
+        };
+    };
+    listRuleVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleVersionList"];
+                };
+            };
+        };
+    };
+    getRuleVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleVersion"];
+                };
+            };
+        };
+    };
+    restoreRuleVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleSetDetail"];
+                };
+            };
+        };
+    };
+    listJokeTips: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TipWall"];
+                };
             };
         };
     };
@@ -2638,6 +4881,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    setTipNoteHidden: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HideTipNoteRequest"];
+            };
+        };
+        responses: {
+            /** @description Done */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    simulateTipPrompt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimulateTipPromptRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tip"];
                 };
             };
         };
@@ -2733,6 +5026,1005 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listFeePolicies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeePolicyList"];
+                };
+            };
+        };
+    };
+    createFeePolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateFeePolicyRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeePolicy"];
+                };
+            };
+            /** @description No writer with that handle */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Out of range or backdated */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listReconciliations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationRunList"];
+                };
+            };
+        };
+    };
+    runReconciliation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationRun"];
+                };
+            };
+        };
+    };
+    listCreatorFundRuns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatorFundRunList"];
+                };
+            };
+        };
+    };
+    postCreatorFund: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatorFundRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatorFundRun"];
+                };
+            };
+            /** @description That period (or part of it) was already paid */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No qualified views in the period */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    previewCreatorFund: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatorFundRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatorFundPreview"];
+                };
+            };
+        };
+    };
+    appealJoke: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAppealRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Appeal"];
+                };
+            };
+            /** @description Already appealed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listMyAppeals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppealList"];
+                };
+            };
+        };
+    };
+    listAppeals: {
+        parameters: {
+            query?: {
+                status?: "open" | "upheld" | "overturned";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppealList"];
+                };
+            };
+        };
+    };
+    resolveAppeal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveAppealRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Appeal"];
+                };
+            };
+        };
+    };
+    getAutomationCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationCatalog"];
+                };
+            };
+        };
+    };
+    getAutomationStats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationStats"];
+                };
+            };
+        };
+    };
+    listWorkflows: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowList"];
+                };
+            };
+        };
+    };
+    createWorkflow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateWorkflowRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowDetail"];
+                };
+            };
+        };
+    };
+    getWorkflow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowDetail"];
+                };
+            };
+        };
+    };
+    deleteWorkflow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    saveWorkflowDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateWorkflowDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowDetail"];
+                };
+            };
+            /** @description Someone else saved in between */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    publishWorkflow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowPublishResult"];
+                };
+            };
+        };
+    };
+    pauseWorkflow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowDetail"];
+                };
+            };
+        };
+    };
+    activateWorkflow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowDetail"];
+                };
+            };
+        };
+    };
+    discardWorkflowDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowDetail"];
+                };
+            };
+        };
+    };
+    listWorkflowVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowVersionList"];
+                };
+            };
+        };
+    };
+    restoreWorkflowVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowDetail"];
+                };
+            };
+        };
+    };
+    listWorkflowRuns: {
+        parameters: {
+            query?: {
+                status?: "running" | "waiting" | "completed" | "stopped" | "failed";
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowRunList"];
+                };
+            };
+        };
+    };
+    startWorkflowRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartWorkflowRunRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Queued"];
+                };
+            };
+        };
+    };
+    listRuns: {
+        parameters: {
+            query?: {
+                status?: "running" | "waiting" | "completed" | "stopped" | "failed";
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowRunList"];
+                };
+            };
+        };
+    };
+    getRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowRunDetail"];
+                };
+            };
+        };
+    };
+    getAdminOverview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminOverview"];
+                };
+            };
+        };
+    };
+    getAdminFinance: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminFinance"];
+                };
+            };
+        };
+    };
+    exportLedger: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getAdminEngagement: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminEngagement"];
+                };
+            };
+        };
+    };
+    listAdminUsers: {
+        parameters: {
+            query?: {
+                q?: string;
+                role?: "reader" | "writer" | "curator" | "admin";
+                tag?: string;
+                status?: "active" | "suspended" | "onboarding";
+                page?: number;
+                size?: number;
+                sort?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserPage"];
+                };
+            };
+        };
+    };
+    getAdminUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserDetail"];
+                };
+            };
+        };
+    };
+    setAdminUserRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetRolesRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserDetail"];
+                };
+            };
+        };
+    };
+    suspendUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuspendRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserDetail"];
+                };
+            };
+        };
+    };
+    unsuspendUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserDetail"];
+                };
+            };
+        };
+    };
+    tagUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                tag: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserDetail"];
+                };
+            };
+        };
+    };
+    untagUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                tag: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserDetail"];
+                };
+            };
+        };
+    };
+    listTags: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TagList"];
+                };
+            };
+        };
+    };
+    listAudit: {
+        parameters: {
+            query?: {
+                action?: string;
+                targetType?: string;
+                before?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditPage"];
+                };
+            };
+        };
+    };
+    getLanding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Landing"];
                 };
             };
         };

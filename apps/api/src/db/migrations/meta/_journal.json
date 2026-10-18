@@ -50,6 +50,20 @@
       "when": 1792183248202,
       "tag": "0006_money",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792214098695,
+      "tag": "0007_v1_moderation_automation",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792266570980,
+      "tag": "0008_money_v2",
+      "breakpoints": true
     }
   ]
 }

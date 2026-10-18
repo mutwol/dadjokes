@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { AppError } from "../common/errors";
 import { InjectDb } from "../db/db.module";
 import type { Db } from "../db/db.module";
-import { userRoles } from "../db/schema";
+import { userRoles, users } from "../db/schema";
 import type { Role } from "../db/schema";
 import { IS_PUBLIC, REQUIRED_ROLES } from "./decorators";
 import type { AuthedRequest } from "./decorators";
@@ -36,7 +36,15 @@ export class AuthGuard implements CanActivate {
     }
 
     const claims = await this.tokens.verifyAccess(token);
-    const rows = await this.db.select({ role: userRoles.role }).from(userRoles).where(eq(userRoles.userId, claims.sub));
+    const [rows, [user]] = await Promise.all([
+      this.db.select({ role: userRoles.role }).from(userRoles).where(eq(userRoles.userId, claims.sub)),
+      this.db.select({ suspendedAt: users.suspendedAt, reason: users.suspendedReason }).from(users).where(eq(users.id, claims.sub)),
+    ]);
+    if (user?.suspendedAt) {
+      throw new AppError(403, "account_suspended", "This account is suspended.", {
+        detail: user.reason ?? "Contact support if you think this is a mistake.",
+      });
+    }
     req.auth = { userId: claims.sub, sessionId: claims.sid, roles: rows.map((r) => r.role) };
     return true;
   }

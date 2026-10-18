@@ -1,15 +1,21 @@
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { api } from "../api/client.ts";
+import { useListMySubscriptionsQuery } from "../api/rtk/index.ts";
 import { disablePush, enablePush } from "../api/push.ts";
-import type { Creator } from "../api/client.ts";
-import { Avatar } from "../components/Avatar.tsx";
+import type { Creator } from "../api/rtk/index.ts";
+import { Avatar } from "@/components/ui/avatar.tsx";
+import { button } from "@/components/ui/button.tsx";
+import { card } from "@/components/ui/card.tsx";
+import { field } from "@/components/ui/input.tsx";
+import { Switch } from "@/components/ui/switch.tsx";
+import { toast } from "@/components/ui/toast.tsx";
+import { cn } from "@/lib/utils.ts";
 import { NameTag } from "../components/NameTag.tsx";
 import { formatHour } from "../components/useCountdown.ts";
 import type { Role } from "../data/types.ts";
 import { useStore } from "../state/useStore.ts";
-import { Switch, button, card, cn, field } from "../components/ui/index.ts";
+import { ThemeToggle } from "../theme/ThemeToggle.tsx";
 
 /** A titled block of the profile page. */
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
@@ -30,7 +36,7 @@ const row = "flex items-center justify-between gap-4 px-4 py-3.5";
 function Setting({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className={row}>
-      <dt className="font-bold">{label}</dt>
+      <dt className="font-medium">{label}</dt>
       <dd className="m-0 min-w-0 text-right text-ink-soft">{children}</dd>
     </div>
   );
@@ -53,7 +59,7 @@ const titleCase = (slug: string) => slug.charAt(0).toUpperCase() + slug.slice(1)
 
 export function Profile() {
   const navigate = useNavigate();
-  const { account, hasRole, setRole, deliveryHour, setDeliveryHour, notifications, setNotifications, signOut, showToast } =
+  const { account, hasRole, setRole, deliveryHour, setDeliveryHour, notifications, setNotifications, signOut } =
     useStore();
   const [pushBusy, setPushBusy] = useState(false);
 
@@ -63,38 +69,28 @@ export function Profile() {
       if (notifications === "on") {
         await disablePush();
         setNotifications("off");
-        showToast("Notifications are off on this device.");
+        toast.info("Notifications are off on this device.");
       } else {
         const result = await enablePush();
         setNotifications(result);
-        showToast(
-          result === "on"
-            ? "Notifications are on. We'll tell you when your joke lands."
-            : result === "denied"
+        if (result === "on") toast.success("Notifications are on. We'll tell you when your joke lands.");
+        else
+          toast.info(
+            result === "denied"
               ? "Notifications are blocked in your browser settings."
               : result === "unsupported"
                 ? "This browser can't show notifications."
                 : "Notifications stay off.",
-        );
+          );
       }
     } catch {
-      showToast("Couldn't change notifications. Try again.");
+      toast.error("Couldn't change notifications. Try again.");
     } finally {
       setPushBusy(false);
     }
   };
-  const [subscriptions, setSubscriptions] = useState<Creator[] | null>(null);
+  const subscriptions: Creator[] | null = useListMySubscriptionsQuery().data?.data ?? null;
   const [busyRole, setBusyRole] = useState<Role | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void api.GET("/v1/me/subscriptions").then(({ data }) => {
-      if (!cancelled) setSubscriptions(data?.data ?? []);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   if (!account) return null;
   const chosenRoles = account.roles.filter((r) => r === "reader" || r === "writer");
@@ -103,13 +99,13 @@ export function Profile() {
   const toggle = async (r: Role) => {
     const on = hasRole(r);
     if (on && chosenRoles.length === 1) {
-      showToast("Keep at least one on.");
+      toast.info("Keep at least one on.");
       return;
     }
     setBusyRole(r);
     try {
       await setRole(r, !on);
-      showToast(
+      toast.success(
         on
           ? r === "writer"
             ? "Writing is off. Your jokes stay in Studio."
@@ -140,6 +136,19 @@ export function Profile() {
         <NameTag name={name.split(" ")[0]} size="s" tilt={4} className="hidden sm:inline-flex" />
       </header>
 
+      {hasRole("curator") || hasRole("admin") ? (
+        <nav className="flex flex-wrap gap-2 lg:hidden" aria-label="Staff">
+          <Link to="/curate" className={button({ variant: "quiet", size: "sm" })}>
+            Curate
+          </Link>
+          {hasRole("admin") ? (
+            <Link to="/admin" className={button({ variant: "quiet", size: "sm" })}>
+              Admin console
+            </Link>
+          ) : null}
+        </nav>
+      ) : null}
+
       <Section id="roles-title" title="How you use Daddy Jokes">
         <ul className={rows}>
           {(["reader", "writer"] as const).map((r) => {
@@ -147,7 +156,7 @@ export function Profile() {
             return (
               <li key={r} className={row}>
                 <div>
-                  <p className="font-extrabold" id={`role-${r}`}>
+                  <p className="font-semibold" id={`role-${r}`}>
                     {ROLE_COPY[r].title}
                   </p>
                   <p className="text-sm text-ink-soft">{on ? ROLE_COPY[r].on : ROLE_COPY[r].off}</p>
@@ -181,6 +190,9 @@ export function Profile() {
                     </option>
                   ))}
                 </select>
+            </Setting>
+            <Setting label="Appearance">
+              <ThemeToggle />
             </Setting>
             <Setting label="Time zone">{account.timezone.replace(/_/g, " ")}</Setting>
             <Setting label="Notifications on this device">

@@ -1,16 +1,19 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { api, errorMessage, unwrap } from "../api/client.ts";
-import type { Activity as ActivityItem } from "../api/client.ts";
-import { Avatar } from "../components/Avatar.tsx";
-import { Icon } from "../components/Icon.tsx";
-import type { IconName } from "../components/Icon.tsx";
+import { problemMessage, useListActivityQuery, useMarkActivityReadMutation } from "../api/rtk/index.ts";
+import type { Activity as ActivityItem } from "../api/rtk/index.ts";
+import { Avatar } from "@/components/ui/avatar.tsx";
+import { button } from "@/components/ui/button.tsx";
+import { card, EmptyState } from "@/components/ui/card.tsx";
+import { Icon } from "@/components/ui/icon.tsx";
+import type { IconName } from "@/components/ui/icon.tsx";
+import { toast } from "@/components/ui/toast.tsx";
+import { cn } from "@/lib/utils.ts";
 import { timeAgo } from "../data/dates.ts";
 import { useStore } from "../state/useStore.ts";
-import { EmptyState, button, card, cn } from "../components/ui/index.ts";
 
 /** Good news (money in, a joke picked) gets a green icon. */
-const GOOD_NEWS = new Set<ActivityItem["type"]>(["joke_scheduled", "tip_received", "payout_paid"]);
+const GOOD_NEWS = new Set<ActivityItem["type"]>(["joke_scheduled", "tip_received", "payout_paid", "appeal_resolved"]);
 
 const ICONS: Record<ActivityItem["type"], IconName> = {
   joke_scheduled: "check",
@@ -22,45 +25,30 @@ const ICONS: Record<ActivityItem["type"], IconName> = {
   tip_received: "coin",
   payout_paid: "coin",
   payout_failed: "coin",
+  report_resolved: "flag",
+  appeal_resolved: "shield",
+  automation: "bell",
 };
 
 export function Activity() {
-  const { clearUnread, showToast } = useStore();
-  const [items, setItems] = useState<ActivityItem[] | null>(null);
-  const [cursor, setCursor] = useState<string | null>(null);
+  const { clearUnread } = useStore();
+  // Pages accumulate in one cache entry; "Show older" passes the cursor (see endpoints.ts).
+  const [older, setOlder] = useState<string | undefined>(undefined);
+  const { data, error, isFetching } = useListActivityQuery({ limit: 30, cursor: older }, { refetchOnMountOrArgChange: true });
+  const [markRead] = useMarkActivityReadMutation();
+  const items = data ? data.data : error ? [] : null;
+  const cursor = data?.nextCursor ?? null;
 
+  // Seen now: everything up to here counts as read (the list still shows what was new).
+  const unread = !older ? (data?.unread ?? 0) : 0;
   useEffect(() => {
-    let cancelled = false;
-    void api
-      .GET("/v1/me/activity", { params: { query: { limit: 30 } } })
-      .then(unwrap)
-      .then(
-        (page) => {
-          if (cancelled) return;
-          setItems(page.data);
-          setCursor(page.nextCursor);
-          // Seen now: everything up to here counts as read (the list still shows what was new).
-          if (page.unread) void api.POST("/v1/me/activity/read").then(clearUnread);
-        },
-        () => {
-          if (!cancelled) setItems([]);
-        },
-      );
-    return () => {
-      cancelled = true;
-    };
-  }, [clearUnread]);
+    if (unread) void markRead().unwrap().then(clearUnread, () => undefined);
+  }, [unread, markRead, clearUnread]);
+  useEffect(() => {
+    if (error && older) toast.error(problemMessage(error));
+  }, [error, older]);
 
-  const more = async () => {
-    if (!cursor) return;
-    try {
-      const page = unwrap(await api.GET("/v1/me/activity", { params: { query: { limit: 30, cursor } } }));
-      setItems((prev) => [...(prev ?? []), ...page.data]);
-      setCursor(page.nextCursor);
-    } catch (e) {
-      showToast(errorMessage(e));
-    }
-  };
+  const more = () => cursor && setOlder(cursor);
 
   return (
     <div className="mx-auto grid max-w-feed gap-4 px-4 pb-8">
@@ -97,7 +85,7 @@ export function Activity() {
                   </span>
                 )}
                 <span className="grid min-w-0 gap-0.5">
-                  <span className="font-extrabold">{a.title}</span>
+                  <span className="font-semibold">{a.title}</span>
                   {a.body ? <span className="wrap-anywhere text-ink-soft">{a.body}</span> : null}
                   <span className="text-sm text-ink-faint">{timeAgo(a.createdAt)}</span>
                 </span>
@@ -108,7 +96,7 @@ export function Activity() {
         </ul>
       )}
       {cursor ? (
-        <button type="button" className={button({ variant: "quiet" })} onClick={() => void more()}>
+        <button type="button" className={button({ variant: "quiet" })} onClick={more} disabled={isFetching} aria-busy={isFetching || undefined}>
           Show older
         </button>
       ) : null}

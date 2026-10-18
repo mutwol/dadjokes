@@ -1,4 +1,5 @@
-import { api } from "./client.ts";
+import { api } from "./rtk/index.ts";
+import { store } from "../state/redux.ts";
 import type { NotificationState } from "../data/types.ts";
 
 const supported = () => "Notification" in window && "serviceWorker" in navigator && "PushManager" in window;
@@ -18,7 +19,8 @@ export async function enablePush(): Promise<NotificationState> {
  */
 export async function syncPush(): Promise<void> {
   if (!supported() || Notification.permission !== "granted") return;
-  const { data: config } = await api.GET("/v1/push/config");
+  // A one-off read outside React: no cache subscription to clean up.
+  const { data: config } = await store.dispatch(api.endpoints.getPushConfig.initiate(undefined, { subscribe: false }));
   if (!config?.enabled || !config.publicKey) return;
   const reg = await navigator.serviceWorker.register("/sw.js");
   await navigator.serviceWorker.ready;
@@ -32,9 +34,9 @@ export async function syncPush(): Promise<void> {
   sub ??= await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
   const json = sub.toJSON();
   if (!json.endpoint || !json.keys?.p256dh || !json.keys.auth) return;
-  await api.PUT("/v1/me/push-subscriptions", {
-    body: { endpoint: json.endpoint, keys: { p256dh: json.keys.p256dh, auth: json.keys.auth } },
-  });
+  await store
+    .dispatch(api.endpoints.addPushSubscription.initiate({ pushSubscriptionRequest: { endpoint: json.endpoint, keys: { p256dh: json.keys.p256dh, auth: json.keys.auth } } }))
+    .unwrap();
 }
 
 /** Stops push to this browser, on the server and in the browser. */
@@ -43,7 +45,10 @@ export async function disablePush(): Promise<void> {
   const reg = await navigator.serviceWorker.getRegistration();
   const sub = await reg?.pushManager.getSubscription();
   if (!sub) return;
-  await api.DELETE("/v1/me/push-subscriptions", { body: { endpoint: sub.endpoint } }).catch(() => undefined);
+  await store
+    .dispatch(api.endpoints.removePushSubscription.initiate({ removePushSubscriptionRequest: { endpoint: sub.endpoint } }))
+    .unwrap()
+    .catch(() => undefined);
   await sub.unsubscribe();
 }
 

@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
+  bigserial,
+  boolean,
   check,
   jsonb,
   date,
@@ -51,6 +53,9 @@ export const users = pgTable(
     /** IANA zone, e.g. Africa/Nairobi. Decides when the daily joke arrives. */
     timezone: text("timezone").notNull().default("UTC"),
     onboardedAt: timestamp("onboarded_at", { withTimezone: true }),
+    /** Set by an admin. A suspended account can't use the API. */
+    suspendedAt: timestamp("suspended_at", { withTimezone: true }),
+    suspendedReason: text("suspended_reason"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -220,6 +225,8 @@ export const jokes = pgTable(
     /** Taken down after it went out (e.g. a reported copy). Hidden from readers from then on. */
     removedAt: timestamp("removed_at", { withTimezone: true }),
     removedBy: uuid("removed_by").references(() => users.id, { onDelete: "set null" }),
+    /** Hidden automatically after enough reports, until a curator looks at it. */
+    hiddenAt: timestamp("hidden_at", { withTimezone: true }),
     updatedAt: updatedAt(),
   },
   (t) => [
@@ -324,6 +331,8 @@ export const comments = pgTable(
     /** Deleted by its author, or removed by a curator. Kept for reports and moderation history. */
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     deletedBy: uuid("deleted_by").references(() => users.id, { onDelete: "set null" }),
+    /** Hidden automatically after enough reports, until a curator looks at it. */
+    hiddenAt: timestamp("hidden_at", { withTimezone: true }),
   },
   (t) => [
     index("comments_joke_idx").on(t.jokeId, t.createdAt),
@@ -403,6 +412,9 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "tip_received",
   "payout_paid",
   "payout_failed",
+  "report_resolved",
+  "appeal_resolved",
+  "automation",
 ]);
 
 /** The Activity feed: things that happened to you, newest first. */
@@ -473,9 +485,28 @@ export const tips = pgTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     paidAt: timestamp("paid_at", { withTimezone: true }),
+    /** Which payment provider collected it, e.g. mpesa_daraja. */
+    provider: text("provider").notNull().default("mpesa_daraja"),
+    /** The fee policy in force when the tip was paid, and the split it produced. Never recomputed. */
+    feePolicyId: uuid("fee_policy_id").references(() => feePolicies.id, { onDelete: "restrict" }),
+    feeBps: integer("fee_bps"),
+    feeCents: bigint("fee_cents", { mode: "number" }),
+    writerCents: bigint("writer_cents", { mode: "number" }),
+    /** Earnings wait in the writer's pending balance until this time, in case the payment is reversed. */
+    releaseAt: timestamp("release_at", { withTimezone: true }),
+    releasedAt: timestamp("released_at", { withTimezone: true }),
+    /** A short public message shown with the tip on the joke, like a Super Chat. */
+    note: text("note"),
+    /** Hide the tipper's name on the joke and in the writer's notification. */
+    anonymous: boolean("anonymous").notNull().default(false),
+    noteHiddenAt: timestamp("note_hidden_at", { withTimezone: true }),
+    noteHiddenBy: uuid("note_hidden_by").references(() => users.id, { onDelete: "set null" }),
   },
   (t) => [
     uniqueIndex("tips_checkout_key").on(t.checkoutRequestId),
+    index("tips_joke_paid_idx").on(t.jokeId, t.paidAt).where(sql`${t.status} = 'paid'`),
+    index("tips_release_idx").on(t.releaseAt).where(sql`${t.status} = 'paid' and ${t.releasedAt} is null`),
+    check("tips_note_length", sql`${t.note} is null or char_length(${t.note}) <= 140`),
     uniqueIndex("tips_receipt_key").on(t.receipt),
     index("tips_creator_idx").on(t.creatorId, t.createdAt),
     index("tips_pending_idx").on(t.createdAt).where(sql`${t.status} = 'pending'`),
@@ -504,6 +535,7 @@ export const payouts = pgTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     completedAt: timestamp("completed_at", { withTimezone: true }),
+    provider: text("provider").notNull().default("mpesa_daraja"),
   },
   (t) => [
     uniqueIndex("payouts_originator_key").on(t.originatorConversationId),
@@ -516,7 +548,9 @@ export const payouts = pgTable(
  * Double-entry ledger in cents. Every transaction (txn_id) sums to zero,
  * enforced by a deferred trigger. Positive is money held (debit), negative is
  * money owed or earned (credit). Accounts: mpesa:clearing, platform:fees,
- * creator:<user id> (what we owe a writer).
+ * platform:creator_fund (what the creator fund has paid out),
+ * creator:<user id>:pending (earned, still on hold) and creator:<user id>
+ * (available to withdraw).
  */
 export const ledgerEntries = pgTable(
   "ledger_entries",
@@ -528,6 +562,7 @@ export const ledgerEntries = pgTable(
     currency: text("currency").notNull().default("KES"),
     tipId: uuid("tip_id").references(() => tips.id, { onDelete: "restrict" }),
     payoutId: uuid("payout_id").references(() => payouts.id, { onDelete: "restrict" }),
+    fundAllocationId: uuid("fund_allocation_id").references(() => creatorFundAllocations.id, { onDelete: "restrict" }),
     memo: text("memo").notNull(),
     createdAt: createdAt(),
   },
@@ -535,6 +570,105 @@ export const ledgerEntries = pgTable(
     index("ledger_account_idx").on(t.account, t.createdAt),
     index("ledger_txn_idx").on(t.txnId),
     check("ledger_nonzero", sql`${t.amountCents} <> 0`),
+  ],
+);
+
+/* ------------------------------------------------------------------ money: fees, reconciliation, creator fund */
+
+/**
+ * The platform's cut, in basis points (100 bps = 1%). The newest policy whose
+ * window covers a moment applies; a creator-specific one beats the default.
+ * Rates change by adding a policy, never by editing one, so every tip can
+ * point at the exact rate it was charged.
+ */
+export const feePolicies = pgTable(
+  "fee_policies",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** ISO country the rate applies to. */
+    country: text("country").notNull().default("KE"),
+    /** Null for everyone; set for a negotiated rate. */
+    creatorId: uuid("creator_id").references(() => users.id, { onDelete: "cascade" }),
+    bps: integer("bps").notNull(),
+    note: text("note").notNull().default(""),
+    effectiveFrom: timestamp("effective_from", { withTimezone: true }).notNull().defaultNow(),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("fee_policies_scope_idx").on(t.country, t.creatorId, t.effectiveFrom),
+    check("fee_policies_bps_range", sql`${t.bps} between 0 and 5000`),
+  ],
+);
+
+export const reconciliationStatusEnum = pgEnum("reconciliation_status", ["ok", "issues", "failed"]);
+
+export interface ReconciliationCheck {
+  key: string;
+  label: string;
+  ok: boolean;
+  /** How many things are off (rows, transactions, accounts). */
+  count: number;
+  /** Money involved, when it's about money. */
+  amountCents?: number;
+  detail?: string;
+}
+
+/** One run of the books check: the ledger against itself, the tips and the payouts. */
+export const reconciliationRuns = pgTable(
+  "reconciliation_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    status: reconciliationStatusEnum("status").notNull(),
+    checks: jsonb("checks").$type<ReconciliationCheck[]>().notNull().default([]),
+    /** Null when the daily schedule ran it. */
+    triggeredBy: uuid("triggered_by").references(() => users.id, { onDelete: "set null" }),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("reconciliation_runs_started_idx").on(t.startedAt)],
+);
+
+/** A creator fund payout for a period: a pool split by qualified views. */
+export const creatorFundRuns = pgTable(
+  "creator_fund_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    periodStart: date("period_start", { mode: "string" }).notNull(),
+    periodEnd: date("period_end", { mode: "string" }).notNull(),
+    poolCents: bigint("pool_cents", { mode: "number" }).notNull(),
+    /** What was actually allocated; rounding leaves a few cents in the pool. */
+    allocatedCents: bigint("allocated_cents", { mode: "number" }).notNull(),
+    qualifiedViews: integer("qualified_views").notNull(),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("creator_fund_runs_period_key").on(t.periodStart, t.periodEnd),
+    check("creator_fund_runs_period", sql`${t.periodEnd} >= ${t.periodStart}`),
+    check("creator_fund_runs_pool", sql`${t.poolCents} > 0`),
+  ],
+);
+
+export const creatorFundAllocations = pgTable(
+  "creator_fund_allocations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => creatorFundRuns.id, { onDelete: "restrict" }),
+    creatorId: uuid("creator_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    views: integer("views").notNull(),
+    amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
+    releaseAt: timestamp("release_at", { withTimezone: true }).notNull(),
+    releasedAt: timestamp("released_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("creator_fund_allocations_key").on(t.runId, t.creatorId),
+    index("creator_fund_allocations_release_idx").on(t.releaseAt).where(sql`${t.releasedAt} is null`),
   ],
 );
 
@@ -548,4 +682,254 @@ export type Comment = typeof comments.$inferSelect;
 export type NotificationType = (typeof notificationTypeEnum.enumValues)[number];
 export type Tip = typeof tips.$inferSelect;
 export type Payout = typeof payouts.$inferSelect;
+export type FeePolicy = typeof feePolicies.$inferSelect;
+export type ReconciliationRun = typeof reconciliationRuns.$inferSelect;
 export type DeclineReason = (typeof declineReasonEnum.enumValues)[number];
+
+/* ------------------------------------------------------------------ v1: moderation and audit */
+
+/** Every staff action worth answering for later: moderation, roles, suspensions, shop and automation changes. */
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** Null when the system did it (e.g. auto-hide by a rule). */
+    actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
+    /** Dotted verb, e.g. report.resolved, user.suspended, order.shipped. */
+    action: text("action").notNull(),
+    targetType: text("target_type").notNull(),
+    targetId: text("target_id").notNull(),
+    data: jsonb("data").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: createdAt(),
+  },
+  (t) => [index("audit_log_created_idx").on(t.createdAt), index("audit_log_target_idx").on(t.targetType, t.targetId)],
+);
+
+export const appealStatusEnum = pgEnum("appeal_status", ["open", "upheld", "overturned"]);
+
+/** A writer asking for a taken-down joke to be looked at again. */
+export const appeals = pgTable(
+  "appeals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    jokeId: uuid("joke_id")
+      .notNull()
+      .references(() => jokes.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    message: text("message").notNull(),
+    status: appealStatusEnum("status").notNull().default("open"),
+    resolvedBy: uuid("resolved_by").references(() => users.id, { onDelete: "set null" }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolutionNote: text("resolution_note"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    /** One open appeal per joke at a time. */
+    uniqueIndex("appeals_one_open_key").on(t.jokeId).where(sql`${t.status} = 'open'`),
+    index("appeals_open_idx").on(t.createdAt).where(sql`${t.status} = 'open'`),
+    check("appeals_message_length", sql`char_length(${t.message}) between 1 and 1000`),
+  ],
+);
+
+/* ------------------------------------------------------------------ v1: rules and automations */
+
+export const ruleSetStatusEnum = pgEnum("rule_set_status", ["draft", "published", "archived"]);
+
+/**
+ * A rule set decides something from facts, with no side effects: facts go in,
+ * outputs and a trace come out. The draft is edited freely; publishing runs the
+ * tests and freezes a version. Code and workflows evaluate the live version.
+ */
+export const ruleSets = pgTable(
+  "rule_sets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** Stable name callers use, e.g. moderation.auto_hide. */
+    key: text("key").notNull(),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    /** Picks the facts the rules can use (see rules/catalog.ts). */
+    decisionPoint: text("decision_point").notNull(),
+    /** Platform rule sets are used by the app itself and can't be deleted. */
+    system: boolean("system").notNull().default(false),
+    status: ruleSetStatusEnum("status").notNull().default("draft"),
+    draft: jsonb("draft").$type<unknown>().notNull(),
+    liveVersion: integer("live_version").notNull().default(0),
+    /** Bumped on every save, for optimistic concurrency. */
+    revision: integer("revision").notNull().default(1),
+    updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("rule_sets_key_key").on(t.key), check("rule_sets_key_format", sql`${t.key} ~ '^[a-z0-9_]+(\\.[a-z0-9_]+)+$'`)],
+);
+
+export const ruleSetVersions = pgTable(
+  "rule_set_versions",
+  {
+    ruleSetId: uuid("rule_set_id")
+      .notNull()
+      .references(() => ruleSets.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    definition: jsonb("definition").$type<unknown>().notNull(),
+    publishedBy: uuid("published_by").references(() => users.id, { onDelete: "set null" }),
+    publishedAt: timestamp("published_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.ruleSetId, t.version] })],
+);
+
+export const workflowStatusEnum = pgEnum("workflow_status", ["draft", "active", "paused"]);
+
+/**
+ * A workflow reacts to an event (a trigger) with a list of steps: filters,
+ * decisions, waits and actions. Edits go to the draft; publishing freezes a
+ * version, and runs always use the version they started on.
+ */
+export const workflows = pgTable(
+  "workflows",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    status: workflowStatusEnum("status").notNull().default("draft"),
+    /** The trigger of the published version, so events find their workflows quickly. */
+    triggerType: text("trigger_type"),
+    draft: jsonb("draft").$type<unknown>().notNull(),
+    publishedVersion: integer("published_version").notNull().default(0),
+    revision: integer("revision").notNull().default(1),
+    templateKey: text("template_key"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("workflows_trigger_idx").on(t.triggerType).where(sql`${t.status} = 'active'`)],
+);
+
+export const workflowVersions = pgTable(
+  "workflow_versions",
+  {
+    workflowId: uuid("workflow_id")
+      .notNull()
+      .references(() => workflows.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    graph: jsonb("graph").$type<unknown>().notNull(),
+    publishedBy: uuid("published_by").references(() => users.id, { onDelete: "set null" }),
+    publishedAt: timestamp("published_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.workflowId, t.version] })],
+);
+
+export const workflowRunStatusEnum = pgEnum("workflow_run_status", ["running", "waiting", "completed", "stopped", "failed"]);
+
+export const workflowRuns = pgTable(
+  "workflow_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workflowId: uuid("workflow_id")
+      .notNull()
+      .references(() => workflows.id, { onDelete: "cascade" }),
+    workflowVersion: integer("workflow_version").notNull(),
+    eventId: bigint("event_id", { mode: "number" }),
+    /** The person the run is about, when the event has one. */
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    status: workflowRunStatusEnum("status").notNull().default("running"),
+    /** The next step to run. */
+    stepIndex: integer("step_index").notNull().default(0),
+    /** The event and everything earlier steps produced, available to later steps. */
+    context: jsonb("context").$type<Record<string, unknown>>().notNull().default({}),
+    resumeAt: timestamp("resume_at", { withTimezone: true }),
+    error: text("error"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("workflow_runs_workflow_idx").on(t.workflowId, t.startedAt),
+    index("workflow_runs_waiting_idx").on(t.resumeAt).where(sql`${t.status} = 'waiting'`),
+    /** An event starts each workflow at most once. */
+    uniqueIndex("workflow_runs_event_key").on(t.workflowId, t.eventId).where(sql`${t.eventId} is not null`),
+  ],
+);
+
+export const workflowRunSteps = pgTable(
+  "workflow_run_steps",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => workflowRuns.id, { onDelete: "cascade" }),
+    stepIndex: integer("step_index").notNull(),
+    stepId: text("step_id").notNull(),
+    type: text("type").notNull(),
+    /** ok, stopped (a filter said no), skipped (e.g. a send blocked by the send policy), waiting, failed. */
+    status: text("status").notNull(),
+    output: jsonb("output").$type<unknown>(),
+    error: text("error"),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("workflow_run_steps_run_idx").on(t.runId, t.stepIndex)],
+);
+
+/**
+ * The outbox of things that happened, written in the same transaction as the
+ * change itself. The worker reads it in order and starts matching workflows.
+ */
+export const domainEvents = pgTable(
+  "domain_events",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    type: text("type").notNull(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
+    /** Makes an event happen once, e.g. one "unopened" event per delivery. */
+    dedupeKey: text("dedupe_key"),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("domain_events_pending_idx").on(t.id).where(sql`${t.processedAt} is null`),
+    index("domain_events_type_idx").on(t.type, t.occurredAt),
+    uniqueIndex("domain_events_dedupe_key").on(t.dedupeKey).where(sql`${t.dedupeKey} is not null`),
+  ],
+);
+
+/** Labels on people for the mini CRM: set by admins or by workflows. */
+export const userTags = pgTable(
+  "user_tags",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tag: text("tag").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.tag] }),
+    index("user_tags_tag_idx").on(t.tag),
+    check("user_tags_format", sql`${t.tag} ~ '^[a-z0-9][a-z0-9_-]{0,39}$'`),
+  ],
+);
+
+/** Every message a workflow sent, for the send policy (frequency caps) and reports. */
+export const automationMessages = pgTable(
+  "automation_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    workflowId: uuid("workflow_id").references(() => workflows.id, { onDelete: "set null" }),
+    runId: uuid("run_id").references(() => workflowRuns.id, { onDelete: "set null" }),
+    channel: text("channel").notNull(),
+    title: text("title").notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("automation_messages_user_idx").on(t.userId, t.sentAt), index("automation_messages_workflow_idx").on(t.workflowId, t.sentAt)],
+);
+
+export type Appeal = typeof appeals.$inferSelect;
+export type RuleSet = typeof ruleSets.$inferSelect;
+export type Workflow = typeof workflows.$inferSelect;
+export type WorkflowRun = typeof workflowRuns.$inferSelect;

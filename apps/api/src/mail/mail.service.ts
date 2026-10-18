@@ -10,8 +10,17 @@ export interface LoginCodeJob {
   code: string;
 }
 
+/** Any other email: automation messages, order updates. */
+export interface MessageJob {
+  to: string;
+  subject: string;
+  text: string;
+  html?: string;
+}
+
 export interface MailJobs {
   "login-code": LoginCodeJob;
+  message: MessageJob;
 }
 
 /**
@@ -37,6 +46,15 @@ export class MailService {
       removeOnComplete: true,
       // Keep failures briefly for debugging, without the code lingering for long.
       removeOnFail: { age: 3600 },
+    });
+  }
+
+  async sendMessage(job: MessageJob) {
+    await this.queue.add("message", job, {
+      attempts: 5,
+      backoff: { type: "exponential", delay: 5000 },
+      removeOnComplete: true,
+      removeOnFail: 200,
     });
   }
 }

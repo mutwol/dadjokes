@@ -18,6 +18,8 @@ export default defineConfig({
       JWT_SECRET: "test-jwt-secret-that-is-long-enough-0123456789",
       CODE_SECRET: "test-code-secret-that-is-long-enough-012345678",
       THROTTLE_DISABLED: "true",
+      // Settle fake M-Pesa by phone number; the in-app prompt is covered in money.e2e.
+      MPESA_FAKE_SETTLE: "auto",
       WEB_ORIGIN: "http://localhost:5173",
       UPLOAD_DIR: process.env.TEST_UPLOAD_DIR ?? "/tmp/daddy-jokes-test-uploads",
     },

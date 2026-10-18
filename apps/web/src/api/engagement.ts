@@ -1,20 +1,26 @@
-import { api, unwrap } from "./client.ts";
-import type { Joke, JokeStats } from "./client.ts";
+import { useCallback } from "react";
+import { api, useReactMutation, useUnreactMutation } from "./rtk/index.ts";
+import type { Joke, JokeStats } from "./rtk/index.ts";
 import type { ReactionKind } from "../data/types.ts";
+import { store } from "../state/redux.ts";
 
-/** Picking your current reaction again takes it back, like the buttons suggest. */
-export async function toggleReaction(jokeId: string, current: ReactionKind | null, kind: ReactionKind): Promise<JokeStats> {
-  const params = { path: { id: jokeId } };
-  return unwrap(
-    current === kind
-      ? await api.DELETE("/v1/jokes/{id}/reaction", { params })
-      : await api.PUT("/v1/jokes/{id}/reaction", { params, body: { kind } }),
+/**
+ * Picking your current reaction again takes it back, like the buttons suggest.
+ * Returns the server's counts; the cached joke updates optimistically (endpoints.ts).
+ */
+export function useToggleReaction() {
+  const [react] = useReactMutation();
+  const [unreact] = useUnreactMutation();
+  return useCallback(
+    (jokeId: string, current: ReactionKind | null, kind: ReactionKind): Promise<JokeStats> =>
+      (current === kind ? unreact({ id: jokeId }) : react({ id: jokeId, reactRequest: { kind } })).unwrap(),
+    [react, unreact],
   );
 }
 
 /** Best effort: replays and shares are stats, never worth an error message. */
 export function recordEvent(jokeId: string, type: "replay" | "share") {
-  void api.POST("/v1/events", { body: { events: [{ jokeId, type }] } }).catch(() => undefined);
+  void store.dispatch(api.endpoints.recordEvents.initiate({ eventsRequest: { events: [{ jokeId, type }] } }));
 }
 
 /** Shares the joke as text: the system share sheet where there is one, else the clipboard. */

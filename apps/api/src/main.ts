@@ -6,6 +6,9 @@ import { SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module";
 import { buildOpenApi, configureApp } from "./bootstrap";
 import { AppConfig } from "./config/config.module";
+import { DB } from "./db/db.module";
+import type { Db } from "./db/db.module";
+import { warnAboutPendingMigrations } from "./db/pending-migrations";
 
 async function main() {
   const app = configureApp(await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: false }));
@@ -15,6 +18,8 @@ async function main() {
     // Interactive docs at /docs, raw spec at /docs/json.
     SwaggerModule.setup("docs", app, buildOpenApi(app), { jsonDocumentUrl: "docs/json" });
   }
+
+  await warnAboutPendingMigrations(app.get<Db>(DB));
 
   const port = config.get("PORT");
   await app.listen(port);

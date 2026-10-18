@@ -8,11 +8,14 @@ import { deliveries, jokes, subscriptions, tips, userPreferences, userRoles, use
 import type { Delivery } from "../db/schema";
 import { JokesService } from "../jokes/jokes.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { EventsService } from "../platform/events.service";
 import { StorageService } from "../storage/storage.service";
 import type { DeliveryCard, ReaderJoke, ReactionKind, Today } from "./schemas";
 
 /** How long a delivered joke can still be opened. */
 export const OPEN_WINDOW_HOURS = 24;
+/** Streak lengths that fire streak.milestone. */
+const STREAK_MILESTONES = [3, 7, 14, 30, 50, 100];
 /** Readers handled per delivery statement, so one run never holds a huge transaction. */
 const BATCH = 5000;
 
@@ -34,6 +37,7 @@ export class DeliveriesService {
     private readonly jokes: JokesService,
     private readonly storage: StorageService,
     private readonly notifications: NotificationsService,
+    private readonly events: EventsService,
   ) {}
 
   /** Lets other modules add to a joke's stats (reactions, comments) without a circular import. */
@@ -69,11 +73,11 @@ export class DeliveriesService {
           select c.user_id, c.local_date, coalesce(
             case when c.joke_origin = 'local' then (
               select j.id from ${jokes} j
-              where j.deliver_on = c.local_date and j.region = c.country and j.status in ('scheduled', 'delivered') and j.removed_at is null
+              where j.deliver_on = c.local_date and j.region = c.country and j.status in ('scheduled', 'delivered') and j.removed_at is null and j.hidden_at is null
             ) end,
             (
               select j.id from ${jokes} j
-              where j.deliver_on = c.local_date and j.region is null and j.status in ('scheduled', 'delivered') and j.removed_at is null
+              where j.deliver_on = c.local_date and j.region is null and j.status in ('scheduled', 'delivered') and j.removed_at is null and j.hidden_at is null
             )
           ) as joke_id
           from candidates c
@@ -188,6 +192,15 @@ export class DeliveriesService {
     };
   }
 
+  /** Tells workflows about an open, and about streak milestones. */
+  private async emitOpened(userId: string, date: string, jokeId: string, now: Date) {
+    const { streak } = await this.today(userId, now);
+    await this.events.emit({ type: "delivery.opened", userId, payload: { jokeId, date, streak }, dedupeKey: `opened:${userId}:${date}` });
+    if (STREAK_MILESTONES.includes(streak) || (streak > 100 && streak % 50 === 0)) {
+      await this.events.emit({ type: "streak.milestone", userId, payload: { streak }, dedupeKey: `streak:${userId}:${date}:${streak}` });
+    }
+  }
+
   /** Opens a delivered joke. Opening again is fine; an expired, unopened one is gone. */
   async open(userId: string, date: string, now = new Date()): Promise<ReaderJoke> {
     const [d] = await this.db
@@ -195,17 +208,23 @@ export class DeliveriesService {
       .from(deliveries)
       .where(and(eq(deliveries.userId, userId), eq(deliveries.localDate, date)));
     if (!d) throw notFound("Joke for that day");
-    const [{ removedAt }] = await this.db.select({ removedAt: jokes.removedAt }).from(jokes).where(eq(jokes.id, d.jokeId));
+    const [{ removedAt, hiddenAt }] = await this.db
+      .select({ removedAt: jokes.removedAt, hiddenAt: jokes.hiddenAt })
+      .from(jokes)
+      .where(eq(jokes.id, d.jokeId));
     if (removedAt) throw new AppError(410, "joke_removed", "This joke was taken down.");
+    if (hiddenAt) throw new AppError(423, "joke_under_review", "This joke is being reviewed after reports. Check back soon.");
     if (!d.openedAt) {
       if (d.expiresAt <= now) {
         throw new AppError(410, "joke_expired", "This joke has gone. Unopened jokes disappear after a day.");
       }
       // Only the first open sets the time, even if two requests race.
-      await this.db
+      const first = await this.db
         .update(deliveries)
         .set({ openedAt: now })
-        .where(and(eq(deliveries.userId, userId), eq(deliveries.localDate, date), sql`${deliveries.openedAt} is null`));
+        .where(and(eq(deliveries.userId, userId), eq(deliveries.localDate, date), sql`${deliveries.openedAt} is null`))
+        .returning({ jokeId: deliveries.jokeId });
+      if (first.length) await this.emitOpened(userId, date, d.jokeId, now);
     }
     return this.getJoke(userId, d.jokeId, { skipAccessCheck: true });
   }
@@ -228,13 +247,16 @@ export class DeliveriesService {
         isSubscribed: sql<boolean>`exists (select 1 from ${subscriptions} s where s.creator_id = ${jokes.creatorId} and s.subscriber_id = ${viewerId})`,
         opened: sql<boolean>`exists (select 1 from ${deliveries} d where d.joke_id = ${jokes.id} and d.user_id = ${viewerId} and d.opened_at is not null)`,
         staff: sql<boolean>`exists (select 1 from ${userRoles} r where r.user_id = ${viewerId} and r.role in ('curator', 'admin'))`,
+        admin: sql<boolean>`exists (select 1 from ${userRoles} r where r.user_id = ${viewerId} and r.role = 'admin')`,
       })
       .from(jokes)
       .innerJoin(users, eq(users.id, jokes.creatorId))
       .where(eq(jokes.id, id));
     const isMine = row?.joke.creatorId === viewerId;
     const privileged = isMine || Boolean(row?.staff);
-    if (!row || !(privileged || ((opts.skipOpenedCheck || row.opened) && !row.joke.removedAt))) throw notFound("Joke");
+    if (!row || !(privileged || ((opts.skipOpenedCheck || row.opened) && !row.joke.removedAt && !row.joke.hiddenAt))) {
+      throw notFound("Joke");
+    }
     return { ...row, isMine };
   }
 

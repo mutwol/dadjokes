@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { Me, Session } from "../api/client.ts";
+import type { Me, Session } from "../api/rtk/index.ts";
 import type { NotificationState, Role } from "../data/types.ts";
 
 export type AuthStatus = "loading" | "signed-out" | "signed-in";
@@ -26,8 +26,6 @@ export interface Store {
   unread: number;
   refreshUnread: () => void;
   clearUnread: () => void;
-  toast: string | null;
-  showToast: (msg: string) => void;
 }
 
 export const Ctx = createContext<Store | null>(null);

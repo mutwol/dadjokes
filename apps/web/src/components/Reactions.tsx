@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { REACTIONS, compact, groanScore, totalReactions } from "../data/reactions.ts";
 import type { ReactionKind } from "../data/types.ts";
-import { cn } from "./ui/index.ts";
+import { cn } from "@/lib/utils.ts";
 
 const SEGMENT: Record<ReactionKind, string> = {
   groan: "bg-tag-red",
@@ -23,7 +23,8 @@ export function ReactionBar({
 }) {
   const [burst, setBurst] = useState<ReactionKind | null>(null);
   return (
-    <div className="grid grid-cols-4 gap-2" role="group" aria-label="React to this joke">
+    // minmax(0, 1fr): long labels ("Ba-dum-tss") truncate instead of pushing the row wider than its container.
+    <div className="grid grid-cols-[repeat(4,minmax(0,1fr))] gap-2" role="group" aria-label="React to this joke">
       {REACTIONS.map((r) => {
         const on = selected === r.kind;
         return (
@@ -31,13 +32,15 @@ export function ReactionBar({
             key={r.kind}
             type="button"
             className={cn(
-              "flex flex-col items-center gap-0.5 rounded-2xl border-2 border-transparent px-1 pt-2.5 pb-2 transition-[border-color,background-color] duration-120",
+              "flex min-w-0 flex-col items-center gap-0.5 border-2 border-transparent px-1 transition-[border-color,background-color] duration-120",
+              // The status viewer is a compact overlay; the joke page gets the roomier tiles.
+              tone === "light" ? "rounded-2xl pt-2.5 pb-2" : "rounded-xl pt-1.5 pb-1.5",
               tone === "light"
                 ? on
                   ? "border-ink bg-cream"
                   : "border-line bg-paper hover:border-line-strong"
                 : on
-                  ? "bg-white text-ink"
+                  ? "theme-light bg-white text-ink"
                   : "bg-white/12 text-white backdrop-blur-sm hover:bg-white/20",
             )}
             aria-pressed={on}
@@ -47,13 +50,13 @@ export function ReactionBar({
             }}
           >
             <span
-              className={cn("inline-block text-[1.75rem] leading-[1.1]", burst === r.kind && "animate-burst")}
+              className={cn("inline-block leading-[1.1]", tone === "light" ? "text-[1.75rem]" : "text-[1.5rem]", burst === r.kind && "animate-burst")}
               onAnimationEnd={() => setBurst(null)}
               aria-hidden="true"
             >
               {r.emoji}
             </span>
-            <span className="max-w-full truncate text-xs font-bold max-xs:text-2xs">{r.label}</span>
+            <span className="max-w-full truncate text-xs font-medium max-xs:text-2xs">{r.label}</span>
             {counts ? <span className="text-xs text-ink-soft">{compact(counts[r.kind])}</span> : null}
           </button>
         );
@@ -69,8 +72,8 @@ export function GroanMeter({ counts }: { counts: Record<ReactionKind, number> })
     <div className="grid gap-3">
       <div className="flex flex-wrap items-baseline gap-3.5">
         <p className="flex items-baseline gap-1.5">
-          <strong className="text-3xl leading-none font-extrabold">{score}</strong>
-          <span className="font-bold text-ink-soft">groan score</span>
+          <strong className="text-3xl leading-none font-bold">{score}</strong>
+          <span className="font-medium text-ink-soft">groan score</span>
         </p>
         <p className="text-sm text-ink-soft">
           {score >= 60

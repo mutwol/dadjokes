@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { button } from "../components/ui/index.ts";
+import { button } from "@/components/ui/button.tsx";
 
 /** Stand-in for screens planned in later steps. */
 export function Placeholder({ title, body }: { title: string; body: string }) {

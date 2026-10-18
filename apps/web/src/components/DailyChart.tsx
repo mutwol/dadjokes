@@ -1,5 +1,6 @@
 import { shortDate } from "../data/dates.ts";
-import { card, cn } from "./ui/index.ts";
+import { card } from "@/components/ui/card.tsx";
+import { cn } from "@/lib/utils.ts";
 
 interface Day {
   date: string;
@@ -17,8 +18,8 @@ export function DailyChart({ title, days, unit }: { title: string; days: Day[]; 
   return (
     <figure className={cn(card, "m-0 grid gap-2.5 px-4 pt-3.5 pb-2.5")}>
       <figcaption className="flex items-baseline justify-between gap-3">
-        <span className="font-extrabold">{title}</span>
-        <span className="text-sm font-bold text-ink-soft">
+        <span className="font-semibold">{title}</span>
+        <span className="text-sm font-medium text-ink-soft">
           {total} {unit}
         </span>
       </figcaption>
@@ -28,7 +29,7 @@ export function DailyChart({ title, days, unit }: { title: string; days: Day[]; 
             <div className="w-full rounded-t-sm bg-denim group-hover:bg-denim-deep" style={{ height: `${Math.max(d.value ? 4 : 0, (d.value / max) * 100)}%` }} />
             <span
               className={cn(
-                "pointer-events-none absolute bottom-[calc(100%+6px)] z-1 rounded-md bg-ink px-2 py-1 text-xs whitespace-nowrap text-white opacity-0 transition-opacity duration-120 group-hover:opacity-100",
+                "pointer-events-none absolute bottom-[calc(100%+6px)] z-1 rounded-md bg-ink px-2 py-1 text-xs whitespace-nowrap text-on-ink opacity-0 transition-opacity duration-120 group-hover:opacity-100",
                 "left-1/2 -translate-x-1/2 group-first:left-0 group-first:translate-x-0 group-last:right-0 group-last:left-auto group-last:translate-x-0",
               )}
             >
@@ -41,17 +42,20 @@ export function DailyChart({ title, days, unit }: { title: string; days: Day[]; 
         <span>{shortDate(days[0].date)}</span>
         <span>{shortDate(days.at(-1)!.date)}</span>
       </div>
-      <table className="sr-only">
-        <caption>{title}</caption>
-        <tbody>
-          {days.map((d) => (
-            <tr key={d.date}>
-              <th scope="row">{shortDate(d.date)}</th>
-              <td>{d.value}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {/* sr-only goes on a wrapper: on the table itself the <caption> escapes the clip and paints over the title. */}
+      <div className="sr-only">
+        <table>
+          <caption>{title}</caption>
+          <tbody>
+            {days.map((d) => (
+              <tr key={d.date}>
+                <th scope="row">{shortDate(d.date)}</th>
+                <td>{d.value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </figure>
   );
 }

@@ -1,18 +1,9 @@
+import { notificationTypeEnum } from "../db/schema";
 import { z } from "zod";
 import { named } from "../common/zod";
 import { Tone } from "../users/schemas";
 
-export const NotificationType = z.enum([
-  "joke_scheduled",
-  "joke_declined",
-  "joke_delivered",
-  "joke_removed",
-  "new_subscriber",
-  "comment",
-  "tip_received",
-  "payout_paid",
-  "payout_failed",
-]);
+export const NotificationType = z.enum(notificationTypeEnum.enumValues);
 
 export const ActivitySchema = named(
   "Activity",

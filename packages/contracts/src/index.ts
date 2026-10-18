@@ -32,6 +32,41 @@ export type Activity = Schemas["Activity"];
 export type Tip = Schemas["Tip"];
 export type Balance = Schemas["Balance"];
 export type PayoutTransfer = Schemas["PayoutTransfer"];
+export type ReportReceipt = Schemas["ReportReceipt"];
+export type Appeal = Schemas["Appeal"];
+
+// Admin console
+export type AdminOverview = Schemas["AdminOverview"];
+export type AdminFinance = Schemas["AdminFinance"];
+export type AdminEngagement = Schemas["AdminEngagement"];
+export type AdminUserRow = Schemas["AdminUserRow"];
+export type AdminUserPage = Schemas["AdminUserPage"];
+export type AdminUserDetail = Schemas["AdminUserDetail"];
+export type AuditEntry = Schemas["AuditEntry"];
+export type Landing = Schemas["Landing"];
+
+// Rules and automations
+export type DecisionPoint = Schemas["DecisionPoint"];
+export type RuleSetSummary = Schemas["RuleSetSummary"];
+export type RuleSetDetail = Schemas["RuleSetDetail"];
+export type RuleDefinition = Schemas["RuleDefinition"];
+export type Rule = Schemas["Rule"];
+export type RuleGroup = Schemas["RuleGroup"];
+export type RuleCondition = Schemas["RuleCondition"];
+export type RuleOutcome = Schemas["RuleOutcome"];
+export type RuleTestCase = Schemas["RuleTestCase"];
+export type RuleEvaluation = Schemas["RuleEvaluation"];
+export type RuleTestReport = Schemas["RuleTestReport"];
+export type RuleVersionList = Schemas["RuleVersionList"];
+export type AutomationCatalog = Schemas["AutomationCatalog"];
+export type AutomationStats = Schemas["AutomationStats"];
+export type WorkflowSummary = Schemas["WorkflowSummary"];
+export type WorkflowDetail = Schemas["WorkflowDetail"];
+export type WorkflowGraph = Schemas["WorkflowGraph"];
+export type WorkflowStep = Schemas["WorkflowStep"];
+export type WorkflowRun = Schemas["WorkflowRun"];
+export type WorkflowRunDetail = Schemas["WorkflowRunDetail"];
+export type WorkflowVersionList = Schemas["WorkflowVersionList"];
 
 /** Error thrown by `unwrap` for any non-2xx response. */
 export class ApiError extends Error {

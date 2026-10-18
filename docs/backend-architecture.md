@@ -27,6 +27,11 @@ apps/api               NestJS: src/main.ts (HTTP), src/worker.ts (queues), src/o
   src/users            /me, onboarding, roles, preferences, handles, topics
   src/creators         writer lists and subscriptions
   src/mail             queue producer (api) and SMTP processor (worker)
+  src/platform         audit log and the domain-event outbox, used by every module
+  src/moderation       appeals against takedowns
+  src/rules            rule sets: model, evaluator, versions, system rule sets
+  src/automation       workflows: admin API (api) and the engine (worker)
+  src/admin            admin console read models, people management, landing data
   test                 end-to-end tests against real Postgres and Redis
 packages/contracts     openapi.json + generated types + typed client
 ```
@@ -85,6 +90,9 @@ packages/contracts     openapi.json + generated types + typed client
 | GET | `/v1/me/balance` | Tips available to withdraw (writers) |
 | GET · POST | `/v1/me/payouts` | Withdrawals · withdraw to M-Pesa (B2C) |
 | GET | `/health` | Postgres and Redis status |
+
+v1 added the public landing data, appeals, comment hiding, the admin console, rule sets and
+workflows: see [v1-implementation.md](./v1-implementation.md) for those endpoints.
 
 Interactive docs run at `http://localhost:3000/docs` in development.
 
@@ -151,10 +159,42 @@ a day already taken by a real (non-seed) joke is left alone and the test joke go
   minute-by-minute sweep settles any tip whose callback never came. Settling happens once.
 - Ledger: `ledger_entries` is double-entry in cents. Every transaction balances, enforced by a
   deferred trigger at commit; entries can't be changed or deleted. A paid tip of 100 posts
-  +10000 to `mpesa:clearing`, −9000 to `creator:<id>` and −1000 to `platform:fees`
-  (`TIP_FEE_PERCENT`). A writer's balance is what `creator:<id>` is owed.
+  +10000 to `mpesa:clearing`, −9000 to `creator:<id>:pending` and −1000 to `platform:fees`
+  (at the writer's fee policy). A writer's withdrawable balance is what `creator:<id>` is owed.
 - Payouts: the balance is debited when the writer asks (under a per-writer lock, so it can't be
   overdrawn), then the worker sends a B2C payment. A failed payout posts a reversal, so the money
   is back in the balance.
 - `MPESA_MODE=fake` (default) needs no Safaricom account; `sandbox` and `production` use Daraja.
-  Revenue share for writers can later post from `platform:fees` the same way.
+  In fake mode `MPESA_FAKE_SETTLE=prompt` (default) shows the tipper a simulated M-Pesa PIN prompt
+  in the app; their answer goes to `POST /v1/tips/:id/simulate` and is fed through the STK callback
+  handler, so the tip settles through the real path (receipts start with `SIM`). `auto` settles by
+  itself after ~3s (phones ending 0000 fail, 1111 cancel); the tests use `auto`.
+
+**Money v2 (built)**
+- Fee policies: the platform's cut lives in `fee_policies` (basis points, per country, optional
+  per-writer override, effective from a moment; never edited or backdated). When a tip is paid
+  the rate in force is resolved and stamped on the tip (`fee_policy_id`, `fee_bps`, `fee_cents`,
+  `writer_cents`). `TIP_FEE_PERCENT` seeds the default the first time it's needed.
+- Holds: a paid tip credits `creator:<id>:pending`; after `TIP_HOLD_HOURS` (default 72) the
+  minute sweep posts pending → `creator:<id>` (available). Only available money can be withdrawn.
+  `GET /v1/me/balance` returns `availableKes`, `pendingKes` and `nextReleaseAt`.
+- Providers: tips and payouts go through `PaymentProvider` (`providers.ts`); Kenya routes to
+  `DarajaProvider` (STK push in, B2C out). Tips and payouts store their `provider`, so adding
+  e.g. Paystack is an adapter plus a registry entry.
+- Books check: `reconciliation_runs`, daily at 00:10 Nairobi and on demand
+  (`POST /v1/admin/finance/reconciliations`): balanced transactions, no overdrawn writer, every
+  paid tip posted exactly as charged, clearing = tips in − payouts out, holds match, nothing stuck.
+  Comparing against Safaricom's own statement comes with the production account.
+- Creator fund: `POST /v1/admin/finance/creator-fund` splits a pool by qualified views (opens by
+  other readers, jokes still up, writers not suspended) with largest-remainder rounding. Each
+  allocation posts `platform:creator_fund` → `creator:<id>:pending` and is held like a tip.
+  Periods can't overlap.
+- Tip messages: a tip can carry a 140-character `note` and be `anonymous`. `GET /v1/jokes/:id/tips`
+  lists paid tips with messages (the tip wall); the writer or a curator can hide a message
+  (`PUT /v1/tips/:id/note-hidden`, audited for curators). The writer's notification reads
+  "You've received a KSh 220 tip from James" with the message as the body.
+
+**Phase 5: v1 (built)**
+- Landing page, moderation (auto-hide by rule set, curator hide, admin decisions, appeals,
+  audit log), the admin console, rule sets and workflows. The shop is a placeholder for now.
+  Details, role matrix and open questions: [v1-implementation.md](./v1-implementation.md).

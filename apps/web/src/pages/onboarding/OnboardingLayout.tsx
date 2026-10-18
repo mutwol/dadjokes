@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
-import { ApiError, api, errorMessage, unwrap } from "../../api/client.ts";
-import { Icon } from "../../components/Icon.tsx";
+import { is, problemMessage, useCompleteOnboardingMutation } from "../../api/rtk/index.ts";
+import { IconButton } from "@/components/ui/button.tsx";
+import { Icon } from "@/components/ui/icon.tsx";
 import { NameTag } from "../../components/NameTag.tsx";
 import { StoryCard } from "../../components/StoryCard.tsx";
-import { IconButton, Toast } from "../../components/ui/index.ts";
 import { SAMPLE_JOKE } from "../../data/sample.ts";
 import type { OnboardingDraft } from "../../data/types.ts";
 import { useStore } from "../../state/useStore.ts";
@@ -12,11 +12,12 @@ import { browserTimeZone, EMPTY_DRAFT, firstName, SIGN_IN_STEPS, stepsFor } from
 import type { Flow, StepId } from "./flow.ts";
 
 export function OnboardingLayout() {
-  const { status, account, setAccount, setNotifications, toast } = useStore();
+  const { status, account, setAccount, setNotifications } = useStore();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [draft, setDraft] = useState<OnboardingDraft>(EMPTY_DRAFT);
   const [saving, setSaving] = useState(false);
+  const [completeOnboarding] = useCompleteOnboardingMutation();
   const [finishing, setFinishing] = useState(false);
   const [saveError, setSaveError] = useState<Flow["saveError"]>(null);
 
@@ -49,9 +50,8 @@ export function OnboardingLayout() {
       setSaveError(null);
       try {
         const name = draft.name || account?.name || "";
-        const me = unwrap(
-          await api.POST("/v1/me/onboarding", {
-            body: {
+        const me = await completeOnboarding({
+          completeOnboardingRequest: {
               name,
               handle: draft.handle,
               country: draft.country,
@@ -66,23 +66,22 @@ export function OnboardingLayout() {
                 draft.roles.includes("writer") && draft.payout.method === "mpesa"
                   ? { method: "mpesa", phone: draft.payout.phone }
                   : undefined,
-            },
-          }),
-        );
+          },
+        }).unwrap();
         setNotifications(draft.notifications);
         setFinishing(true);
         setAccount(me);
         void navigate(to, { replace: true });
       } catch (e) {
         // Send people back to the step that needs fixing.
-        if (e instanceof ApiError && e.code === "handle_taken") {
-          setSaveError({ step: "profile", message: e.problem.title });
+        if (is(e, "handle_taken")) {
+          setSaveError({ step: "profile", message: problemMessage(e) });
           void navigate("/welcome/profile");
-        } else if (e instanceof ApiError && e.code === "already_onboarded") {
+        } else if (is(e, "already_onboarded")) {
           setFinishing(false);
           void navigate("/", { replace: true });
         } else {
-          setSaveError({ step: "done", message: errorMessage(e) });
+          setSaveError({ step: "done", message: problemMessage(e) });
         }
       } finally {
         setSaving(false);
@@ -144,7 +143,6 @@ export function OnboardingLayout() {
         </div>
       </main>
 
-      {toast ? <Toast placement="bottom">{toast}</Toast> : null}
     </div>
   );
 }

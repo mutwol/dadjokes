@@ -26,7 +26,9 @@ export const CommentSchema = named(
     createdAt: z.iso.datetime(),
     author: z.object({ id: z.uuid(), name: z.string(), handle: z.string(), tone: Tone }),
     isMine: z.boolean(),
-    canDelete: z.boolean(),
+    canDelete: z.boolean().describe("Authors can delete their own comments; admins any."),
+    canHide: z.boolean().describe("Curators and admins can hide a comment from readers."),
+    hidden: z.boolean().describe("Hidden from readers (only staff and the author see it)."),
   }),
 );
 export type CommentOut = z.infer<typeof CommentSchema>;
@@ -94,8 +96,12 @@ export const ReportedItemSchema = named(
     reasons: z.record(z.string(), z.number().int()),
     notes: z.array(z.string()),
     firstReportedAt: z.iso.datetime(),
+    hidden: z.boolean().describe("Hidden from readers automatically, waiting for a decision."),
+    resolution: z.enum(["dismissed", "removed"]).nullable(),
+    resolvedAt: z.iso.datetime().nullable(),
+    resolvedBy: z.string().nullable().describe("Handle of the curator who decided."),
   }),
-  "Something readers flagged, with every open report about it combined.",
+  "Something readers flagged, with every report about it combined.",
 );
 
 export const ReportedItemListSchema = named("ReportedItemList", z.object({ data: z.array(ReportedItemSchema) }));
@@ -103,8 +109,24 @@ export const ReportedItemListSchema = named("ReportedItemList", z.object({ data:
 export const ResolveReportsRequest = named(
   "ResolveReportsRequest",
   z
-    .object({ jokeId: z.uuid().optional(), commentId: z.uuid().optional(), action: z.enum(["dismiss", "remove"]) })
+    .object({
+      jokeId: z.uuid().optional(),
+      commentId: z.uuid().optional(),
+      action: z.enum(["dismiss", "remove"]),
+      note: z.string().trim().max(500).optional().describe("Why, for the audit log."),
+    })
     .refine((r) => Boolean(r.jokeId) !== Boolean(r.commentId), { message: "Resolve either a joke or a comment." }),
   "Close every open report about one thing: leave it up, or take it down.",
 );
 export type ResolveReportsRequest = z.infer<typeof ResolveReportsRequest>;
+
+export const ReportsQuery = z.object({ status: z.enum(["open", "resolved"]).default("open") });
+export type ReportsQuery = z.infer<typeof ReportsQuery>;
+
+export const ReportReceiptSchema = named(
+  "ReportReceipt",
+  z.object({
+    alreadyReported: z.boolean(),
+    hidden: z.boolean().describe("It's now hidden from readers while curators review it."),
+  }),
+);

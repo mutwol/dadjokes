@@ -1,28 +1,49 @@
-import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useWatch } from "react-hook-form";
 import { Link, useNavigate, useParams } from "react-router";
-import { ApiError, api, errorMessage, unwrap } from "../api/client.ts";
-import type { Comment, Joke, Tip } from "../api/client.ts";
-import { shareJoke, toggleReaction } from "../api/engagement.ts";
+import { z } from "zod";
+import {
+  api,
+  problemMessage,
+  useAddCommentMutation,
+  useDeleteCommentMutation,
+  useGetJokeQuery,
+  useGetTipQuery,
+  useHideCommentMutation,
+  useListCommentsQuery,
+  useSubscribeMutation,
+  useTipJokeMutation,
+  useUnhideCommentMutation,
+  useUnsubscribeMutation,
+} from "../api/rtk/index.ts";
+import type { Comment, Joke, Tip } from "../api/rtk/index.ts";
+import { shareJoke, useToggleReaction } from "../api/engagement.ts";
+import { Avatar } from "@/components/ui/avatar.tsx";
+import { button, IconButton, TextButton } from "@/components/ui/button.tsx";
+import { Card } from "@/components/ui/card.tsx";
+import { CheckRow } from "@/components/ui/check-row.tsx";
+import { choice } from "@/components/ui/choice.tsx";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog.tsx";
+import { Form, FormError, SubmitButton, TextareaField, TextField } from "@/components/ui/form.tsx";
+import { Icon } from "@/components/ui/icon.tsx";
+import { help } from "@/components/ui/label.tsx";
+import { toast } from "@/components/ui/toast.tsx";
+import { useZodForm } from "@/hooks/useZodForm.ts";
+import { cn } from "@/lib/utils.ts";
 import { useLiveStats } from "../api/useLiveStats.ts";
-import { Avatar } from "../components/Avatar.tsx";
-import { Icon } from "../components/Icon.tsx";
 import { GroanMeter, ReactionBar } from "../components/Reactions.tsx";
+import { ReportDialog } from "../components/ReportDialog.tsx";
+import { reportToast } from "../components/reportToast.ts";
+import type { ReportTarget } from "../components/ReportDialog.tsx";
+import { SimulatedMpesaPrompt } from "../components/SimulatedMpesaPrompt.tsx";
 import { StoryCard } from "../components/StoryCard.tsx";
+import { TipWall } from "../components/TipWall.tsx";
+import { ksh, tipTier } from "../components/tipTiers.ts";
 import { longDate, timeAgo } from "../data/dates.ts";
 import { faceOf } from "../data/face.ts";
 import { compact, totalReactions } from "../data/reactions.ts";
+import { useAppDispatch } from "../state/redux.ts";
 import { useStore } from "../state/useStore.ts";
-import {
-  Card,
-  IconButton,
-  TextButton,
-  button,
-  choice,
-  cn,
-  field,
-  help,
-} from "../components/ui/index.ts";
 
 const TIP_STATUS: Record<string, string> = {
   pending: "text-ink",
@@ -33,8 +54,6 @@ const TIP_STATUS: Record<string, string> = {
 };
 
 const TIP_AMOUNTS = [20, 50, 100, 250];
-/** The platform's share, as configured on the API (TIP_FEE_PERCENT). */
-const TIP_FEE = 10;
 const PHONE_KEY = "daddyjokes.tipPhone";
 
 function savedPhone(): string {
@@ -48,28 +67,14 @@ function savedPhone(): string {
 export function JokeDetail() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
-  const { showToast } = useStore();
-  const [joke, setJoke] = useState<Joke | null>(null);
+  const { data: joke, isError } = useGetJokeQuery({ id }, { skip: !id });
 
+  // Gone, removed or not yours to see: say so and go home.
   useEffect(() => {
-    let cancelled = false;
-    api
-      .GET("/v1/jokes/{id}", { params: { path: { id } } })
-      .then(unwrap)
-      .then(
-        (j) => {
-          if (!cancelled) setJoke(j);
-        },
-        () => {
-          if (cancelled) return;
-          showToast("That joke isn't available.");
-          void navigate("/", { replace: true });
-        },
-      );
-    return () => {
-      cancelled = true;
-    };
-  }, [id, navigate, showToast]);
+    if (!isError) return;
+    toast.error("That joke isn't available.");
+    void navigate("/", { replace: true });
+  }, [isError, navigate]);
 
   if (!joke) return <div className="mx-auto max-w-wide px-4 lg:px-8" aria-busy="true" />;
   return <Detail key={joke.id} joke={joke} />;
@@ -77,132 +82,98 @@ export function JokeDetail() {
 
 function Detail({ joke }: { joke: Joke }) {
   const navigate = useNavigate();
-  const { showToast, account } = useStore();
+  const { account } = useStore();
+  const dispatch = useAppDispatch();
   const [stats, setStats] = useLiveStats(joke.id, { ...joke.stats, myReaction: joke.myReaction });
-  const [comments, setComments] = useState<Comment[] | null>(null);
-  const [moreCursor, setMoreCursor] = useState<string | null>(null);
-  const [posting, setPosting] = useState(false);
-  const [draft, setDraft] = useState("");
   const [tipOpen, setTipOpen] = useState(false);
-  const [tip, setTip] = useState(50);
   const [subscribed, setSubscribed] = useState(joke.creator.isSubscribed);
-  const [tipPhone, setTipPhone] = useState(savedPhone);
-  const [tipState, setTipState] = useState<Tip | null>(null);
+  const [tipId, setTipId] = useState<string | null>(null);
+  // Test mode (fake M-Pesa): the tip waits for an answer on this simulated phone prompt.
+  const [prompt, setPrompt] = useState<Tip | null>(null);
+  const toggleReaction = useToggleReaction();
+  const [tipJoke] = useTipJokeMutation();
+  const [addComment] = useAddCommentMutation();
+  const [deleteComment] = useDeleteCommentMutation();
+  const [hideComment] = useHideCommentMutation();
+  const [unhideComment] = useUnhideCommentMutation();
+  const [subscribe] = useSubscribeMutation();
+  const [unsubscribe] = useUnsubscribeMutation();
 
   // Follow a pending tip until M-Pesa says how it went (the PIN prompt takes a few seconds).
-  useEffect(() => {
-    if (tipState?.status !== "pending") return;
-    const id = tipState.id;
-    const t = window.setTimeout(async () => {
-      const { data } = await api.GET("/v1/tips/{id}", { params: { path: { id } } });
-      if (!data) return;
-      setTipState(data);
-      if (data.status === "paid") showToast(`Tip sent to ${joke.creator.name.split(" ")[0]}. Thank you!`);
-    }, 2000);
-    return () => window.clearTimeout(t);
-  }, [tipState, showToast, joke.creator.name]);
-
-  const sendTip = async (e: FormEvent) => {
-    e.preventDefault();
-    try {
-      window.localStorage.setItem(PHONE_KEY, tipPhone);
-    } catch {
-      // Not remembered on this device; that's fine.
-    }
-    try {
-      setTipState(
-        unwrap(await api.POST("/v1/jokes/{id}/tips", { params: { path: { id: joke.id } }, body: { amountKes: tip, phone: tipPhone } })),
-      );
-    } catch (err) {
-      const fields = err instanceof ApiError ? Object.values(err.fieldErrors()) : [];
-      showToast(fields[0] ?? errorMessage(err));
-    }
-  };
-
+  // Poll every 2s while the tip is pending; stop as soon as it settles.
+  const tipArg = { id: tipId ?? "" };
+  const lastTip = api.endpoints.getTip.useQueryState(tipArg, { skip: !tipId }).data;
+  const { data: tipState } = useGetTipQuery(tipArg, { skip: !tipId, pollingInterval: !lastTip || lastTip.status === "pending" ? 2000 : 0 });
+  const pending = tipState?.status === "pending";
   const creator = joke.creator;
   const counts = stats.reactions;
   const first = creator.name.split(" ")[0];
-
   useEffect(() => {
-    let cancelled = false;
-    void api
-      .GET("/v1/jokes/{id}/comments", { params: { path: { id: joke.id }, query: { limit: 20 } } })
-      .then(unwrap)
-      .then((page) => {
-        if (cancelled) return;
-        setComments(page.data);
-        setMoreCursor(page.nextCursor);
-      }, () => undefined);
-    return () => {
-      cancelled = true;
-    };
-    // Reload when the live count changes, so other people's comments show up.
-  }, [joke.id, stats.comments]);
+    if (tipState?.status !== "paid") return;
+    toast.success(`Tip sent to ${first}. Thank you!`);
+    // Put it on the tip wall straight away.
+    dispatch(api.util.invalidateTags([{ type: "TipWall", id: joke.id }]));
+  }, [tipState?.status, first, dispatch, joke.id]);
 
-  const loadMore = async () => {
-    if (!moreCursor) return;
-    const page = unwrap(
-      await api.GET("/v1/jokes/{id}/comments", { params: { path: { id: joke.id }, query: { limit: 20, cursor: moreCursor } } }),
-    );
-    setComments((prev) => [...(prev ?? []), ...page.data.filter((c) => !prev?.some((p) => p.id === c.id))]);
-    setMoreCursor(page.nextCursor);
-  };
+  // Comments: pages accumulate in one cache entry ("Older comments" appends; see endpoints.ts).
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const commentsQuery = useListCommentsQuery({ id: joke.id, limit: 20, cursor });
+  const comments = commentsQuery.data?.data ?? null;
+  const moreCursor = commentsQuery.data?.nextCursor ?? null;
+  const { refetch: refetchComments } = commentsQuery;
+  // The live count moved (someone else commented): fetch the first page again.
+  const seenCount = useRef(stats.comments);
+  useEffect(() => {
+    if (stats.comments === seenCount.current) return;
+    seenCount.current = stats.comments;
+    if (!cursor && commentsQuery.isSuccess) void refetchComments();
+  }, [stats.comments, cursor, refetchComments, commentsQuery.isSuccess]);
+  const loadMore = () => moreCursor && setCursor(moreCursor);
 
   const react = async (kind: NonNullable<Joke["myReaction"]>) => {
     try {
       setStats(await toggleReaction(joke.id, stats.myReaction, kind));
     } catch (e) {
-      showToast(errorMessage(e));
-    }
-  };
-
-  const post = async (e: FormEvent) => {
-    e.preventDefault();
-    const body = draft.trim();
-    if (!body || posting) return;
-    setPosting(true);
-    try {
-      const c = unwrap(await api.POST("/v1/jokes/{id}/comments", { params: { path: { id: joke.id } }, body: { body } }));
-      setComments((prev) => [c, ...(prev ?? [])]);
-      setStats((s) => ({ ...s, comments: s.comments + 1 }));
-      setDraft("");
-    } catch (err) {
-      showToast(errorMessage(err));
-    } finally {
-      setPosting(false);
+      toast.error(problemMessage(e));
     }
   };
 
   const remove = async (c: Comment) => {
-    const { response } = await api.DELETE("/v1/comments/{id}", { params: { path: { id: c.id } } });
-    if (!response.ok) return showToast("Couldn't delete that comment.");
-    setComments((prev) => prev?.filter((x) => x.id !== c.id) ?? null);
-    setStats((s) => ({ ...s, comments: Math.max(0, s.comments - 1) }));
+    try {
+      await deleteComment({ id: c.id }).unwrap();
+      setStats((s) => ({ ...s, comments: Math.max(0, s.comments - 1) }));
+      toast.success("Comment deleted.");
+    } catch (e) {
+      toast.error(problemMessage(e, "Couldn't delete that comment."));
+    }
   };
 
-  const report = async (target: { jokeId: string } | { commentId: string }, what: string) => {
-    const { response } = await api.POST("/v1/reports", {
-      body: { ...target, reason: "jokeId" in target ? "copied" : "offensive" },
-    });
-    showToast(response.ok ? `Thanks. The curators will look at this ${what}.` : "Couldn't send the report. Try again.");
+  const [reporting, setReporting] = useState<ReportTarget | null>(null);
+
+  /** Curators and admins can hide a comment from readers (or show it again). */
+  const setHidden = async (c: Comment, hidden: boolean) => {
+    try {
+      await (hidden ? hideComment({ id: c.id }) : unhideComment({ id: c.id })).unwrap();
+      toast.success(hidden ? "Comment hidden from readers." : "Comment visible again.");
+    } catch (e) {
+      toast.error(problemMessage(e, "Couldn't change that comment. Try again."));
+    }
   };
 
   const share = async () => {
     const result = await shareJoke(joke);
-    if (result === "copied") showToast("Copied. Go spread the groans.");
+    if (result === "copied") toast.success("Copied. Go spread the groans.");
   };
 
   const toggleSubscribe = async () => {
     const on = subscribed;
     setSubscribed(!on);
-    const params = { path: { creatorId: creator.id } };
-    const { response } = on
-      ? await api.DELETE("/v1/me/subscriptions/{creatorId}", { params })
-      : await api.PUT("/v1/me/subscriptions/{creatorId}", { params });
-    if (response.ok) showToast(on ? `Unsubscribed from ${first}` : `Subscribed to ${first}`);
-    else {
+    try {
+      await (on ? unsubscribe({ creatorId: creator.id }) : subscribe({ creatorId: creator.id })).unwrap();
+      toast.success(on ? `Unsubscribed from ${first}` : `Subscribed to ${first}`);
+    } catch (e) {
       setSubscribed(on);
-      showToast("Couldn't update your subscription. Try again.");
+      toast.error(problemMessage(e, "Couldn't update your subscription. Try again."));
     }
   };
 
@@ -229,7 +200,7 @@ function Detail({ joke }: { joke: Joke }) {
             </button>
           </div>
           {joke.isMine ? null : (
-            <TextButton onClick={() => void report({ jokeId: joke.id }, "joke")}>Report this joke as copied</TextButton>
+            <TextButton onClick={() => setReporting({ jokeId: joke.id, what: "joke" })}>Report this joke</TextButton>
           )}
         </div>
 
@@ -238,7 +209,7 @@ function Detail({ joke }: { joke: Joke }) {
             <div className="flex items-center gap-2.5">
               <Avatar name={creator.name} tone={creator.tone} size={48} />
               <div>
-                <p className="leading-[1.25] font-extrabold">{creator.name}</p>
+                <p className="leading-[1.25] font-semibold">{creator.name}</p>
                 <p className="text-sm text-ink-soft">
                   @{creator.handle}
                   {creator.country ? `, ${creator.country}` : ""}
@@ -280,49 +251,38 @@ function Detail({ joke }: { joke: Joke }) {
 
             {tipOpen ? (
               <div id="tip-panel" className="grid gap-3 border-t border-line pt-3.5">
-                <p className="font-extrabold">Send {first} a tip for this one</p>
-                <div className="grid grid-cols-4 gap-2" role="radiogroup" aria-label="Tip amount">
-                  {TIP_AMOUNTS.map((a) => (
-                    <button
-                      key={a}
-                      type="button"
-                      role="radio"
-                      aria-checked={tip === a}
-                      className={choice(tip === a, { className: "min-h-11 rounded-lg text-sm font-bold" })}
-                      onClick={() => setTip(a)}
-                    >
-                      KES {a}
-                    </button>
-                  ))}
-                </div>
-                <form className="grid gap-2.5" onSubmit={(e) => void sendTip(e)}>
-                  <label className="grid gap-1 text-sm font-bold">
-                    <span>M-Pesa number</span>
-                    <input
-                      className={field("sm", "min-h-11 px-3 py-2.5")}
-                      type="tel"
-                      inputMode="tel"
-                      autoComplete="tel"
-                      placeholder="0712 345 678"
-                      value={tipPhone}
-                      onChange={(e) => setTipPhone(e.target.value)}
-                      disabled={tipState !== null && tipState.status === "pending"}
-                    />
-                  </label>
-                  <button
-                    type="submit"
-                    className={button({ block: true })}
-                    disabled={!tipPhone.trim() || (tipState !== null && tipState.status === "pending")}
-                  >
-                    {tipState?.status === "pending" ? "Waiting for your PIN…" : `Tip KES ${tip} with M-Pesa`}
-                  </button>
-                </form>
-                {tipState ? (
-                  <p className={cn("text-sm font-bold", TIP_STATUS[tipState.status])} role="status">
+                <p className="font-semibold">Send {first} a tip for this one</p>
+                <TipForm
+                  first={first}
+                  disabled={pending}
+                  onSubmit={async (v) => {
+                    try {
+                      window.localStorage.setItem(PHONE_KEY, v.phone);
+                    } catch {
+                      // Not remembered on this device; that's fine.
+                    }
+                    const t = await tipJoke({
+                      id: joke.id,
+                      createTipRequest: { amountKes: v.amount, phone: v.phone, note: v.note || undefined, anonymous: v.anonymous },
+                    }).unwrap();
+                    setTipId(t.id);
+                    if (t.simulated && t.status === "pending") setPrompt(t);
+                  }}
+                />
+                {tipState && tipId ? (
+                  <p className={cn("text-sm font-medium", TIP_STATUS[tipState.status])} role="status">
                     {tipState.message}
+                    {tipState.simulated && pending && !prompt ? (
+                      <>
+                        {" "}
+                        <button type="button" className="border-0 bg-transparent p-0 font-medium text-ink underline underline-offset-2" onClick={() => setPrompt(tipState)}>
+                          Open the test prompt
+                        </button>
+                      </>
+                    ) : null}
                   </p>
                 ) : (
-                  <p className={help}>You'll get a prompt on your phone. {first} gets {100 - TIP_FEE}% of it.</p>
+                  <p className={help}>You'll get a prompt on your phone. Your tip and message show under the joke.</p>
                 )}
               </div>
             ) : null}
@@ -345,26 +305,18 @@ function Detail({ joke }: { joke: Joke }) {
           </section>
         </div>
 
-        <section className="grid gap-4 lg:col-start-1 lg:row-start-2 lg:max-w-[640px]" aria-labelledby="comments-title">
+        <div className="grid content-start gap-8 lg:col-start-1 lg:row-start-2 lg:max-w-[640px]">
+        <TipWall jokeId={joke.id} />
+        <section className="grid gap-4" aria-labelledby="comments-title">
           <h2 id="comments-title" className="text-xl">Comments ({stats.comments})</h2>
-          <form className="flex items-center gap-2.5" onSubmit={(e) => void post(e)}>
-            <Avatar name={account?.name ?? "You"} tone={account?.tone ?? "navy"} size={36} />
-            <label className="sr-only" htmlFor="comment">
-              Add a comment
-            </label>
-            <input
-              id="comment"
-              className="min-h-11 min-w-0 flex-1 rounded-full border-2 border-line-strong bg-paper px-4 focus:border-ink focus:outline-none"
-              value={draft}
-              maxLength={280}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder="Add a groan of your own"
-              autoComplete="off"
-            />
-            <button type="submit" className={button({ size: "sm" })} disabled={!draft.trim() || posting}>
-              Post
-            </button>
-          </form>
+          <CommentForm
+            name={account?.name ?? "You"}
+            tone={account?.tone ?? "navy"}
+            onSubmit={async (body) => {
+              await addComment({ id: joke.id, createCommentRequest: { body } }).unwrap();
+              setStats((x) => ({ ...x, comments: x.comments + 1 }));
+            }}
+          />
           {comments !== null && comments.length === 0 ? (
             <p className="py-4.5 text-ink-soft">No comments yet. Be the first to groan in writing.</p>
           ) : (
@@ -373,18 +325,33 @@ function Detail({ joke }: { joke: Joke }) {
                 <li key={c.id} className="flex gap-3 border-t border-line py-3.5">
                   <Avatar name={c.author.name} tone={c.author.tone} size={36} />
                   <div className="grid min-w-0 gap-0.5">
-                    <p className="flex items-baseline gap-2">
+                    <p className="flex flex-wrap items-baseline gap-2">
                       <strong>{c.author.name}</strong>
                       <span className="text-sm text-ink-faint">{timeAgo(c.createdAt)}</span>
+                      {c.hidden ? (
+                        <span className="inline-flex items-center gap-1 rounded-sm bg-butter px-1.5 py-px text-xs font-medium text-butter-ink">
+                          <Icon name="eyeOff" size={13} /> Hidden from readers
+                        </span>
+                      ) : null}
                     </p>
-                    <p>{c.body}</p>
+                    <p className={c.hidden ? "text-ink-soft" : undefined}>{c.body}</p>
                     <div className="flex gap-3.5">
                       {c.canDelete ? (
-                        <TextButton onClick={() => void remove(c)}>Delete</TextButton>
+                        <ConfirmDialog
+                          trigger={<TextButton>Delete</TextButton>}
+                          title="Delete this comment?"
+                          description={c.isMine ? "It's removed for everyone. You can't undo this." : `${c.author.name}'s comment is removed for everyone. You can't undo this.`}
+                          confirmLabel="Delete comment"
+                          pendingLabel="Deleting…"
+                          onConfirm={() => remove(c)}
+                        />
                       ) : null}
                       {c.isMine ? null : (
-                        <TextButton onClick={() => void report({ commentId: c.id }, "comment")}>Report</TextButton>
+                        <TextButton onClick={() => setReporting({ commentId: c.id, what: "comment" })}>Report</TextButton>
                       )}
+                      {c.canHide && !c.isMine ? (
+                        <TextButton onClick={() => void setHidden(c, !c.hidden)}>{c.hidden ? "Unhide" : "Hide"}</TextButton>
+                      ) : null}
                     </div>
                   </div>
                 </li>
@@ -395,13 +362,109 @@ function Detail({ joke }: { joke: Joke }) {
             <button
               type="button"
               className={button({ variant: "quiet", size: "sm" })}
-              onClick={() => void loadMore()}
+              onClick={loadMore}
+              disabled={commentsQuery.isFetching}
+              aria-busy={commentsQuery.isFetching || undefined}
             >
-              Older comments
+              {commentsQuery.isFetching && cursor ? "Loading…" : "Older comments"}
             </button>
           ) : null}
         </section>
+        </div>
       </div>
+      <SimulatedMpesaPrompt tip={prompt} onClose={() => setPrompt(null)} />
+      <ReportDialog
+        target={reporting}
+        onClose={() => setReporting(null)}
+        onDone={(receipt, target) => {
+          setReporting(null);
+          toast.success(reportToast(receipt, target.what));
+          // Enough reports hid it straight away: drop it from the list.
+          if (receipt.hidden && "commentId" in target && commentsQuery.isSuccess) void refetchComments();
+        }}
+      />
     </div>
+  );
+}
+
+const KENYAN_MOBILE = /^(?:\+?254|0)?(7|1)\d{8}$/;
+const tipSchema = z.object({
+  amount: z.number().int().min(10, "Tips start at KES 10.").max(10000, "Tips go up to KES 10,000."),
+  phone: z
+    .string()
+    .trim()
+    .transform((x) => x.replace(/[\s-]/g, ""))
+    .refine((x) => KENYAN_MOBILE.test(x), "Enter a Kenyan M-Pesa number, like 0712 345 678."),
+  note: z.string().trim().max(140, "Keep the message to 140 characters."),
+  anonymous: z.boolean(),
+});
+type TipValues = z.output<typeof tipSchema>;
+
+/**
+ * Amount chips, an optional public message (shown like a Super Chat, in the
+ * colour of the amount), and the M-Pesa number, remembered on this device.
+ */
+function TipForm({ first, disabled, onSubmit }: { first: string; disabled: boolean; onSubmit: (v: TipValues) => Promise<void> }) {
+  const form = useZodForm(tipSchema, { defaultValues: { amount: 50, phone: savedPhone(), note: "", anonymous: false } });
+  // useWatch, not form.watch: the React Compiler would memoize watch() and miss changes.
+  const [amount, note, anonymous] = useWatch({ control: form.control, name: ["amount", "note", "anonymous"] });
+  const tier = tipTier(amount);
+  return (
+    <Form form={form} onSubmit={onSubmit} className="gap-3">
+      <div className="grid grid-cols-4 gap-2" role="radiogroup" aria-label={`Tip amount for ${first}`}>
+        {TIP_AMOUNTS.map((a) => (
+          <button
+            key={a}
+            type="button"
+            role="radio"
+            aria-checked={amount === a}
+            className={choice(amount === a, { className: "min-h-10 rounded-md text-sm font-medium" })}
+            onClick={() => form.setValue("amount", a, { shouldDirty: true })}
+          >
+            {ksh(a)}
+          </button>
+        ))}
+      </div>
+      <TextareaField
+        name="note"
+        label="Message"
+        optional
+        rows={2}
+        maxLength={140}
+        placeholder={`Say something to ${first}`}
+        disabled={disabled}
+        help={`${note.length}/140 · Shows with your tip under the joke.`}
+      />
+      {note.trim() ? (
+        <div className="overflow-hidden rounded-lg text-sm" aria-label="Preview">
+          <p className={cn("px-3 py-1.5 font-semibold", tier.head)}>{ksh(amount)}</p>
+          <p className={cn("px-3 py-2 break-words", tier.body)}>{note.trim()}</p>
+        </div>
+      ) : null}
+      <CheckRow checked={anonymous} onChange={(v) => form.setValue("anonymous", v, { shouldDirty: true })} title="Tip anonymously">
+        Your name is hidden on the joke and from {first}.
+      </CheckRow>
+      <TextField name="phone" label="M-Pesa number" fieldSize="sm" type="tel" inputMode="tel" autoComplete="tel" placeholder="0712 345 678" disabled={disabled} />
+      <FormError />
+      <SubmitButton block disabled={disabled} pendingLabel="Sending the prompt…">
+        {disabled ? "Waiting for your PIN…" : `Tip ${ksh(amount)} with M-Pesa`}
+      </SubmitButton>
+    </Form>
+  );
+}
+
+const commentSchema = z.object({ body: z.string().trim().min(1, "Write something first.").max(280, "Keep it under 280 characters.") });
+
+function CommentForm({ name, tone, onSubmit }: { name: string; tone: Joke["background"]; onSubmit: (body: string) => Promise<void> }) {
+  const form = useZodForm(commentSchema, { defaultValues: { body: "" }, mode: "onSubmit" });
+  return (
+    <Form form={form} resetOnSuccess onSubmit={({ body }) => onSubmit(body)} className="grid-cols-[auto_1fr_auto] items-start gap-2.5">
+      <Avatar name={name} tone={tone} size={36} />
+      <TextField name="body" label="Add a comment" hideLabel className="min-w-0" maxLength={280} placeholder="Add a groan of your own" autoComplete="off" />
+      <SubmitButton size="md" variant="primary">
+        Post
+      </SubmitButton>
+      <FormError className="col-span-3" />
+    </Form>
   );
 }

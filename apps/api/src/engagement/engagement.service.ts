@@ -10,6 +10,9 @@ import { comments, jokeEvents, jokes, jokeStatsDaily, reactions, reports, userRo
 import { DeliveriesService, zeroReactions } from "../deliveries/deliveries.service";
 import type { ReactionKind } from "../deliveries/schemas";
 import { NotificationsService } from "../notifications/notifications.service";
+import { AuditService } from "../platform/audit.service";
+import { EventsService } from "../platform/events.service";
+import { RulesService } from "../rules/rules.service";
 import { LiveService } from "./live.service";
 import type {
   CommentOut,
@@ -29,6 +32,9 @@ export class EngagementService implements OnModuleInit {
     private readonly deliveries: DeliveriesService,
     private readonly live: LiveService,
     private readonly notifications: NotificationsService,
+    private readonly rules: RulesService,
+    private readonly audit: AuditService,
+    private readonly events: EventsService,
   ) {}
 
   /** Reactions and comments become part of every joke's stats. */
@@ -90,7 +96,7 @@ export class EngagementService implements OnModuleInit {
   }
 
   async listComments(viewerId: string, jokeId: string, q: CommentsQuery) {
-    const { staff } = await this.deliveries.access(viewerId, jokeId);
+    const { staff, admin } = await this.deliveries.access(viewerId, jokeId);
     const after = decodeCursor(q.cursor, isTimeCursor);
     const rows = await this.db
       .select({ c: comments, name: users.name, handle: users.handle, tone: users.tone })
@@ -100,6 +106,7 @@ export class EngagementService implements OnModuleInit {
         and(
           eq(comments.jokeId, jokeId),
           isNull(comments.deletedAt),
+          staff ? undefined : or(isNull(comments.hiddenAt), eq(comments.userId, viewerId)),
           after
             ? or(
                 lt(comments.createdAt, new Date(after.t)),
@@ -113,7 +120,7 @@ export class EngagementService implements OnModuleInit {
     const page = rows.slice(0, q.limit);
     const last = page.at(-1);
     return {
-      data: page.map((r) => toComment(r, viewerId, staff)),
+      data: page.map((r) => toComment(r, viewerId, { staff, admin })),
       nextCursor: rows.length > q.limit && last ? encodeCursor({ t: last.c.createdAt.toISOString(), id: last.c.id }) : null,
     };
   }
@@ -135,7 +142,7 @@ export class EngagementService implements OnModuleInit {
         data: { excerpt: body.length > 100 ? `${body.slice(0, 99)}…` : body },
       });
     }
-    return toComment({ c, ...me }, viewerId, false);
+    return toComment({ c, ...me }, viewerId, { staff: false, admin: false });
   }
 
   /** Authors can delete their own comments; curators any. Repeating is fine. */
@@ -143,17 +150,39 @@ export class EngagementService implements OnModuleInit {
     const [row] = await this.db
       .select({
         c: comments,
-        staff: sql<boolean>`exists (select 1 from ${userRoles} r where r.user_id = ${viewerId} and r.role in ('curator', 'admin'))`,
+        admin: sql<boolean>`exists (select 1 from ${userRoles} r where r.user_id = ${viewerId} and r.role = 'admin')`,
       })
       .from(comments)
       .where(eq(comments.id, commentId));
-    if (!row || (row.c.userId !== viewerId && !row.staff)) throw notFound("Comment");
+    if (!row || (row.c.userId !== viewerId && !row.admin)) throw notFound("Comment");
     if (row.c.deletedAt) return;
     await this.db.update(comments).set({ deletedAt: new Date(), deletedBy: viewerId }).where(eq(comments.id, commentId));
     this.live.changed(row.c.jokeId);
   }
 
-  /** Files a report. Reporting the same thing twice is fine and changes nothing. */
+  /**
+   * Curators (and admins) can hide a comment from readers, or show it again.
+   * Its reports stay open: taking it down or dismissing them is for admins.
+   */
+  async setCommentHidden(staffId: string, commentId: string, hidden: boolean) {
+    const [c] = await this.db.select().from(comments).where(eq(comments.id, commentId));
+    if (!c || c.deletedAt) throw notFound("Comment");
+    if (Boolean(c.hiddenAt) === hidden) return;
+    await this.db.transaction(async (tx) => {
+      await tx.update(comments).set({ hiddenAt: hidden ? new Date() : null }).where(eq(comments.id, commentId));
+      await this.audit.record(
+        { actorId: staffId, action: hidden ? "comment.hidden" : "comment.unhidden", targetType: "comment", targetId: commentId, data: { jokeId: c.jokeId } },
+        tx,
+      );
+    });
+    this.live.changed(c.jokeId);
+  }
+
+  /**
+   * Files a report. Reporting the same thing twice is fine and changes nothing.
+   * After a new report, the moderation.auto_hide rule set decides whether to
+   * hide the joke or comment from readers until a curator looks at it.
+   */
   async report(viewerId: string, req: CreateReportRequest) {
     let jokeId = req.jokeId;
     if (req.commentId) {
@@ -162,7 +191,7 @@ export class EngagementService implements OnModuleInit {
       jokeId = c.jokeId;
     }
     await this.deliveries.access(viewerId, jokeId!);
-    await this.db
+    const [created] = await this.db
       .insert(reports)
       .values({
         reporterId: viewerId,
@@ -171,7 +200,114 @@ export class EngagementService implements OnModuleInit {
         reason: req.reason,
         note: req.note || null,
       })
-      .onConflictDoNothing();
+      .onConflictDoNothing()
+      .returning({ id: reports.id });
+    if (!created) return { alreadyReported: true, hidden: await this.isHidden(req) };
+    const hidden = await this.decideAutoHide(req, jokeId!);
+    return { alreadyReported: false, hidden };
+  }
+
+  private async isHidden(req: { jokeId?: string; commentId?: string }) {
+    if (req.commentId) {
+      const [c] = await this.db.select({ h: comments.hiddenAt }).from(comments).where(eq(comments.id, req.commentId));
+      return Boolean(c?.h);
+    }
+    const [j] = await this.db.select({ h: jokes.hiddenAt }).from(jokes).where(eq(jokes.id, req.jokeId!));
+    return Boolean(j?.h);
+  }
+
+  /** Builds the facts about the reported thing, asks the rule set, and hides it if told to. */
+  private async decideAutoHide(req: CreateReportRequest, jokeId: string): Promise<boolean> {
+    const target = req.commentId ? "comment" : "joke";
+    const targetFilter = req.commentId ? sql`r.comment_id = ${req.commentId}` : sql`r.joke_id = ${jokeId}`;
+    const { rows } = await this.db.execute<{ reason: string; n: number; reporters: number }>(sql`
+      select r.reason, count(*)::int as n, count(distinct r.reporter_id)::int as reporters
+      from ${reports} r where r.resolved_at is null and ${targetFilter}
+      group by r.reason
+    `);
+    const reasons: Record<string, number> = { copied: 0, offensive: 0, spam: 0, other: 0 };
+    for (const r of rows) reasons[r.reason] = r.n;
+    const total = rows.reduce((n, r) => n + r.n, 0);
+    const [{ distinct }] = (
+      await this.db.execute<{ distinct: number }>(sql`
+        select count(distinct r.reporter_id)::int as distinct from ${reports} r where r.resolved_at is null and ${targetFilter}`)
+    ).rows;
+
+    const author = req.commentId
+      ? (await this.db.select({ id: comments.userId, at: comments.createdAt, hidden: comments.hiddenAt }).from(comments).where(eq(comments.id, req.commentId)))[0]
+      : (await this.db.select({ id: jokes.creatorId, at: jokes.reviewedAt, hidden: jokes.hiddenAt }).from(jokes).where(eq(jokes.id, jokeId)))[0];
+    if (!author) return false;
+    const [{ removed }] = (
+      await this.db.execute<{ removed: number }>(sql`
+        select (
+          (select count(*) from ${jokes} where creator_id = ${author.id} and removed_at > now() - interval '90 days') +
+          (select count(*) from ${comments} where user_id = ${author.id} and deleted_by is not null and deleted_by <> user_id and deleted_at > now() - interval '90 days')
+        )::int as removed`)
+    ).rows;
+
+    const facts = {
+      target,
+      reports: total,
+      distinctReporters: distinct,
+      reasons,
+      authorRemovedLast90d: removed,
+      ageHours: author.at ? Math.floor((Date.now() - author.at.getTime()) / 3_600_000) : 0,
+    };
+    const decision = await this.rules.evaluateLive("moderation.auto_hide", facts);
+    // If the rule set is missing or archived, fall back to "three different people".
+    const hide = decision ? decision.outputs.hide === true : distinct >= 3;
+    const notifyStaff = decision ? decision.outputs.notifyStaff === true : hide;
+
+    let hiddenNow = false;
+    if (hide && !author.hidden) {
+      const now = new Date();
+      hiddenNow = await this.db.transaction(async (tx) => {
+        const changed = req.commentId
+          ? await tx.update(comments).set({ hiddenAt: now }).where(and(eq(comments.id, req.commentId), isNull(comments.hiddenAt))).returning({ id: comments.id })
+          : await tx.update(jokes).set({ hiddenAt: now }).where(and(eq(jokes.id, jokeId), isNull(jokes.hiddenAt))).returning({ id: jokes.id });
+        if (!changed.length) return false;
+        await this.audit.record(
+          {
+            actorId: null,
+            action: "content.auto_hidden",
+            targetType: target,
+            targetId: req.commentId ?? jokeId,
+            data: { facts, ruleSetVersion: decision?.version ?? null, matched: decision?.matched ?? [] },
+          },
+          tx,
+        );
+        return true;
+      });
+      if (hiddenNow) this.live.changed(jokeId);
+    }
+
+    if (hiddenNow && notifyStaff) await this.alertStaff(target, jokeId);
+    await this.events.emit({
+      type: "report.created",
+      userId: author.id,
+      payload: { target, jokeId, commentId: req.commentId ?? null, reason: req.reason, reports: total, hidden: hide || Boolean(author.hidden) },
+    });
+    return hide || Boolean(author.hidden);
+  }
+
+  private async alertStaff(target: "joke" | "comment", jokeId: string) {
+    const staff = await this.db
+      .selectDistinct({ id: userRoles.userId })
+      .from(userRoles)
+      .where(inArray(userRoles.role, ["curator", "admin"]));
+    for (const s of staff) {
+      await this.notifications.notify({
+        userId: s.id,
+        type: "automation",
+        jokeId,
+        data: {
+          title: `A reported ${target} was hidden`,
+          body: "Enough people reported it that it's hidden until someone reviews it.",
+          url: "/curate?tab=reports",
+        },
+        dedupeKey: `hidden:${target}:${jokeId}:${new Date().toISOString().slice(0, 13)}`,
+      });
+    }
   }
 
   /** Records replays and shares, dropping any for jokes the viewer can't see. */
@@ -249,8 +385,12 @@ export class EngagementService implements OnModuleInit {
     });
   }
 
-  /** Open reports, one entry per reported joke or comment, most reported first. */
-  async openReports() {
+  /**
+   * Reports, one entry per reported joke or comment. Open ones come most
+   * reported first; resolved ones (the last 30 days) newest first.
+   */
+  async listReports(status: "open" | "resolved" = "open") {
+    const open = status === "open";
     const rows = await this.db.execute<{
       joke_id: string;
       comment_id: string | null;
@@ -260,31 +400,41 @@ export class EngagementService implements OnModuleInit {
       reasons: Record<string, number>;
       notes: string[];
       first_reported_at: string;
+      hidden: boolean;
+      resolution: string | null;
+      resolved_at: string | null;
+      resolved_by: string | null;
     }>(sql`
-      with open as (
+      with picked as (
         select r.*, coalesce(r.joke_id, c.joke_id) as target_joke
         from ${reports} r left join ${comments} c on c.id = r.comment_id
-        where r.resolved_at is null
+        where ${open ? sql`r.resolved_at is null` : sql`r.resolved_at > now() - interval '30 days'`}
       ), grouped as (
         select target_joke, comment_id, count(*)::int as reports, min(created_at) as first_reported_at,
-               coalesce(array_agg(note) filter (where note is not null), '{}') as notes
-        from open group by target_joke, comment_id
+               coalesce(array_agg(note) filter (where note is not null), '{}') as notes,
+               max(resolved_at) as resolved_at,
+               (array_agg(resolution order by resolved_at desc nulls last))[1]::text as resolution,
+               (array_agg(resolved_by order by resolved_at desc nulls last))[1] as resolved_by_id
+        from picked group by target_joke, comment_id
       ), reasons as (
         select target_joke, comment_id, jsonb_object_agg(reason, n) as reasons
-        from (select target_joke, comment_id, reason, count(*)::int as n from open group by 1, 2, 3) x
+        from (select target_joke, comment_id, reason, count(*)::int as n from picked group by 1, 2, 3) x
         group by 1, 2
       )
       select g.target_joke as joke_id, g.comment_id,
              coalesce(c.body, j.setup || ' ' || coalesce(j.punchline, ''), j.caption, j.image_alt, '') as preview,
              coalesce(cu.handle, ju.handle, '') as author_handle,
-             g.reports, rs.reasons, g.notes, g.first_reported_at
+             g.reports, rs.reasons, g.notes, g.first_reported_at,
+             (case when g.comment_id is null then j.hidden_at is not null else c.hidden_at is not null end) as hidden,
+             g.resolution, g.resolved_at, rb.handle as resolved_by
       from grouped g
       join reasons rs on rs.target_joke = g.target_joke and rs.comment_id is not distinct from g.comment_id
       join ${jokes} j on j.id = g.target_joke
       join ${users} ju on ju.id = j.creator_id
       left join ${comments} c on c.id = g.comment_id
       left join ${users} cu on cu.id = c.user_id
-      order by g.reports desc, g.first_reported_at asc
+      left join ${users} rb on rb.id = g.resolved_by_id
+      order by ${open ? sql`hidden desc, g.reports desc, g.first_reported_at asc` : sql`g.resolved_at desc`}
       limit 100
     `);
     return {
@@ -298,28 +448,46 @@ export class EngagementService implements OnModuleInit {
         reasons: r.reasons,
         notes: r.notes,
         firstReportedAt: new Date(r.first_reported_at).toISOString(),
+        hidden: r.hidden,
+        resolution: (r.resolution as "dismissed" | "removed" | null) ?? null,
+        resolvedAt: r.resolved_at ? new Date(r.resolved_at).toISOString() : null,
+        resolvedBy: r.resolved_by,
       })),
     };
   }
 
-  /** Closes every open report about one joke or comment, taking it down if asked. */
+  /** Kept for callers of the old name. */
+  openReports() {
+    return this.listReports("open");
+  }
+
+  /**
+   * Closes every open report about one joke or comment. "remove" takes it down;
+   * "dismiss" leaves it up and un-hides it if it was hidden automatically.
+   * Reporters hear the outcome, and the decision goes in the audit log.
+   */
   async resolve(curatorId: string, req: ResolveReportsRequest) {
     const now = new Date();
+    const remove = req.action === "remove";
+    let jokeIdForLive: string | null = null;
     await this.db.transaction(async (tx) => {
       if (req.commentId) {
         const [c] = await tx.select({ jokeId: comments.jokeId }).from(comments).where(eq(comments.id, req.commentId));
         if (!c) throw notFound("Comment");
-        if (req.action === "remove") {
+        jokeIdForLive = c.jokeId;
+        if (remove) {
           await tx
             .update(comments)
             .set({ deletedAt: now, deletedBy: curatorId })
             .where(and(eq(comments.id, req.commentId), isNull(comments.deletedAt)));
-          this.live.changed(c.jokeId);
+        } else {
+          await tx.update(comments).set({ hiddenAt: null }).where(eq(comments.id, req.commentId));
         }
       } else {
         const [j] = await tx.select().from(jokes).where(eq(jokes.id, req.jokeId!));
         if (!j) throw notFound("Joke");
-        if (req.action === "remove") {
+        jokeIdForLive = j.id;
+        if (remove) {
           const taken = await tx
             .update(jokes)
             .set({ removedAt: now, removedBy: curatorId })
@@ -332,25 +500,51 @@ export class EngagementService implements OnModuleInit {
             );
           }
           this.logger.log(`Joke ${req.jokeId} taken down by ${curatorId}`);
+        } else {
+          await tx.update(jokes).set({ hiddenAt: null }).where(eq(jokes.id, req.jokeId!));
         }
       }
-      await tx
+      const closed = await tx
         .update(reports)
-        .set({ resolvedAt: now, resolvedBy: curatorId, resolution: req.action === "remove" ? "removed" : "dismissed" })
+        .set({ resolvedAt: now, resolvedBy: curatorId, resolution: remove ? "removed" : "dismissed" })
         .where(
           and(
             isNull(reports.resolvedAt),
             req.commentId ? eq(reports.commentId, req.commentId) : eq(reports.jokeId, req.jokeId!),
           ),
+        )
+        .returning({ id: reports.id, reporterId: reports.reporterId });
+      await this.audit.record(
+        {
+          actorId: curatorId,
+          action: remove ? "report.removed" : "report.dismissed",
+          targetType: req.commentId ? "comment" : "joke",
+          targetId: req.commentId ?? req.jokeId!,
+          data: { reports: closed.length, note: req.note ?? null },
+        },
+        tx,
+      );
+      for (const r of closed) {
+        await this.notifications.notify(
+          {
+            userId: r.reporterId,
+            type: "report_resolved",
+            jokeId: jokeIdForLive,
+            data: { target: req.commentId ? "comment" : "joke", action: remove ? "removed" : "dismissed" },
+            dedupeKey: `report:${r.id}`,
+          },
+          tx,
         );
+      }
     });
+    if (jokeIdForLive) this.live.changed(jokeIdForLive);
   }
 }
 
 function toComment(
   r: { c: typeof comments.$inferSelect; name: string | null; handle: string | null; tone: CommentOut["author"]["tone"] },
   viewerId: string,
-  staff: boolean,
+  viewer: { staff: boolean; admin: boolean },
 ): CommentOut {
   return {
     id: r.c.id,
@@ -358,6 +552,8 @@ function toComment(
     createdAt: r.c.createdAt.toISOString(),
     author: { id: r.c.userId, name: r.name ?? r.handle ?? "", handle: r.handle ?? "", tone: r.tone },
     isMine: r.c.userId === viewerId,
-    canDelete: r.c.userId === viewerId || staff,
+    canDelete: r.c.userId === viewerId || viewer.admin,
+    canHide: viewer.staff,
+    hidden: r.c.hiddenAt !== null,
   };
 }

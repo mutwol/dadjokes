@@ -1,4 +1,4 @@
-import { cn } from "./ui/index.ts";
+import { cn } from "@/lib/utils.ts";
 
 const SIZES = {
   s: { band: "px-1 pt-0.75 pb-0.5 text-[0.5rem]", name: "px-2 pt-1 pb-0.75 text-[0.875rem]" },
@@ -29,12 +29,12 @@ export function NameTag({
       )}
       style={{ rotate: `${tilt}deg` }}
     >
-      <span className={cn("text-center font-extrabold tracking-[0.01em] whitespace-nowrap text-white", SIZES[size].band)}>
+      <span className={cn("text-center font-semibold tracking-[0.01em] whitespace-nowrap text-white", SIZES[size].band)}>
         Hello, my name is
       </span>
       <span
         className={cn(
-          "rounded-sm bg-white text-center font-marker whitespace-nowrap text-ink",
+          "theme-light rounded-sm bg-white text-center font-marker whitespace-nowrap text-ink",
           SIZES[size].name,
         )}
       >

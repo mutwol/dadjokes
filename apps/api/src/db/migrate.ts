@@ -2,12 +2,13 @@ import path from "node:path";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
+import { ensureSystemRuleSets } from "../rules/system";
 import { topics } from "./schema";
 
 /** Product data every environment needs, production included. Safe to re-run. */
 export const TOPICS = ["Wordplay", "Food", "School", "Work", "Animals", "Kids", "Science", "Sports"];
 
-/** Applies pending SQL migrations, then makes sure reference data (topics) exists. Safe to run repeatedly. */
+/** Applies pending SQL migrations, then makes sure reference data (topics, system rule sets) exists. Safe to run repeatedly. */
 export async function runMigrations(databaseUrl: string) {
   const pool = new Pool({ connectionString: databaseUrl, max: 1 });
   try {
@@ -17,6 +18,8 @@ export async function runMigrations(databaseUrl: string) {
       .insert(topics)
       .values(TOPICS.map((label, position) => ({ slug: label.toLowerCase(), label, position })))
       .onConflictDoNothing();
+    // Rule sets the app relies on (auto-hide, send policy).
+    await ensureSystemRuleSets(db);
   } finally {
     await pool.end();
   }

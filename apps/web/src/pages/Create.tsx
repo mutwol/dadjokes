@@ -1,94 +1,107 @@
 import { useEffect, useState } from "react";
-import type { ChangeEvent, FormEvent } from "react";
+import { useFormState, useWatch } from "react-hook-form";
+import type { ChangeEvent } from "react";
 import { useNavigate } from "react-router";
-import { ApiError, api, errorMessage, unwrap } from "../api/client.ts";
-import type { Topic } from "../api/client.ts";
-import { Icon } from "../components/Icon.tsx";
+import { z } from "zod";
+import { problemMessage, useCreateUploadMutation, useListTopicsQuery, useSubmitJokeMutation } from "../api/rtk/index.ts";
+import { button, IconButton } from "@/components/ui/button.tsx";
+import { CheckRow } from "@/components/ui/check-row.tsx";
+import { Chip } from "@/components/ui/chip.tsx";
+import { Form, FormError, FormField, useFieldIds } from "@/components/ui/form.tsx";
+import { Icon } from "@/components/ui/icon.tsx";
+import { field } from "@/components/ui/input.tsx";
+import { errorText, fieldset, help, label } from "@/components/ui/label.tsx";
+import { segment, segmented } from "@/components/ui/segmented.tsx";
+import { toast } from "@/components/ui/toast.tsx";
+import { useZodForm } from "@/hooks/useZodForm.ts";
+import { TONE } from "@/lib/tones.ts";
+import { cn } from "@/lib/utils.ts";
 import { StoryCard } from "../components/StoryCard.tsx";
-import type { JokeBackground } from "../data/types.ts";
-import { useStore } from "../state/useStore.ts";
-import {
-  CheckRow,
-  Chip,
-  IconButton,
-  Select,
-  TONE,
-  Textarea,
-  button,
-  cn,
-  errorText,
-  field,
-  fieldset,
-  help,
-  label,
-  segment,
-  segmented,
-} from "../components/ui/index.ts";
 
-/** Label on the left, character count on the right. */
-function FieldHead({ htmlFor, children, count }: { htmlFor: string; children: string; count: string }) {
-  return (
-    <div className="flex items-baseline justify-between">
-      <label htmlFor={htmlFor} className={label}>
-        {children}
-      </label>
-      <span className={help}>{count}</span>
-    </div>
-  );
-}
-
-const BACKGROUNDS: { value: JokeBackground; label: string }[] = [
+const BACKGROUNDS = [
   { value: "red", label: "Name-tag red" },
   { value: "navy", label: "Polo navy" },
   { value: "yellow", label: "Highlighter yellow" },
   { value: "green", label: "Lawn green" },
   { value: "denim", label: "Denim" },
-];
+] as const;
 
-const REGIONS = [
-  "Everywhere",
-  "Kenya",
-  "Nigeria",
-  "South Africa",
-  "United Kingdom",
-  "United States",
-];
+const REGIONS = ["Everywhere", "Kenya", "Nigeria", "South Africa", "United Kingdom", "United States"];
 
 const IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"] as const;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
 const SETUP_MAX = 140;
 const PUNCH_MAX = 80;
+const ALT_MAX = 200;
+const CAPTION_MAX = 80;
+
+/**
+ * One schema for both formats: the fields of the format not in use are ignored.
+ * Messages are written for the person filling the form in, not for a developer.
+ */
+const schema = z
+  .object({
+    kind: z.enum(["text", "image"]),
+    setup: z.string().trim().max(SETUP_MAX),
+    punchline: z.string().trim().max(PUNCH_MAX),
+    background: z.enum(["red", "navy", "yellow", "green", "denim"]),
+    imageKey: z.string(),
+    imageAlt: z.string().trim().max(ALT_MAX),
+    caption: z.string().trim().max(CAPTION_MAX),
+    region: z.string(),
+    topics: z.array(z.string()).max(3, "Pick up to three topics."),
+    original: z.boolean().refine((v) => v, "Confirm the joke is your own to submit."),
+  })
+  .superRefine((v, ctx) => {
+    if (v.kind === "text") {
+      if (!v.setup) ctx.addIssue({ code: "custom", path: ["setup"], message: "Add a setup." });
+      if (!v.punchline) ctx.addIssue({ code: "custom", path: ["punchline"], message: "Add a punchline." });
+    } else {
+      if (!v.imageKey) ctx.addIssue({ code: "custom", path: ["imageKey"], message: "Add an image." });
+      if (v.imageAlt.length < 3) ctx.addIssue({ code: "custom", path: ["imageAlt"], message: "Describe the image in a few words." });
+    }
+  });
+
+/** Character count shown next to a field's label. */
+function Count({ value, max }: { value: string; max: number }) {
+  return <span className={cn(help, "tabular-nums", value.length >= max && "text-tag-red-deep")}>{`${value.length}/${max}`}</span>;
+}
+
+/** A registered input or textarea that picks up the label/help/error wiring of its <FormField>. */
+function Control({ as = "input", className, ...props }: { as?: "input" | "textarea" } & Record<string, unknown>) {
+  const ids = useFieldIds();
+  const Tag = as;
+  return <Tag {...ids} className={field("md", cn(as === "textarea" && "resize-y", className as string))} {...props} />;
+}
 
 export function Create() {
   const navigate = useNavigate();
-  const { showToast } = useStore();
-  const [topicList, setTopicList] = useState<Topic[]>([]);
-  const [sending, setSending] = useState(false);
-  const [serverError, setServerError] = useState("");
-  const [kind, setKind] = useState<"text" | "image">("text");
-  const [setup, setSetup] = useState("");
-  const [punchline, setPunchline] = useState("");
-  const [background, setBackground] = useState<JokeBackground>("red");
+  const { data: topics } = useListTopicsQuery();
+  const [submitJoke] = useSubmitJokeMutation();
+  const [createUpload] = useCreateUploadMutation();
   const [imageUrl, setImageUrl] = useState<string>();
-  const [imageKey, setImageKey] = useState<string>();
   const [uploading, setUploading] = useState(false);
-  const [imageAlt, setImageAlt] = useState("");
-  const [caption, setCaption] = useState("");
-  const [region, setRegion] = useState("Everywhere");
-  const [tags, setTags] = useState<string[]>([]);
-  const [original, setOriginal] = useState(false);
   const [showPunch, setShowPunch] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    void api.GET("/v1/topics").then(({ data }) => {
-      if (!cancelled) setTopicList(data?.data ?? []);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const form = useZodForm(schema, {
+    defaultValues: {
+      kind: "text",
+      setup: "",
+      punchline: "",
+      background: "red",
+      imageKey: "",
+      imageAlt: "",
+      caption: "",
+      region: "Everywhere",
+      topics: [],
+      original: false,
+    },
+  });
+  const { register, setValue, setError, clearErrors } = form;
+  const v = { ...form.getValues(), ...useWatch({ control: form.control }) };
+  // Subscribed hooks rather than form.watch()/form.formState: the React Compiler memoizes reads off `form`.
+  const formState = useFormState({ control: form.control });
 
   useEffect(
     () => () => {
@@ -97,87 +110,72 @@ export function Create() {
     [imageUrl],
   );
 
-  const hasContent =
-    kind === "text" ? setup.trim() && punchline.trim() : Boolean(imageKey) && imageAlt.trim().length >= 3;
-  const ready = Boolean(hasContent) && original;
+  // Warn before leaving with a half-written joke.
+  const dirty = formState.isDirty && !formState.isSubmitSuccessful;
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
 
   /** Uploads straight to storage as soon as an image is picked, so submitting is instant. */
   const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    if (!IMAGE_TYPES.includes(file.type as (typeof IMAGE_TYPES)[number])) {
-      setServerError("Use a PNG, JPG, GIF or WebP image.");
-      return;
-    }
-    if (file.size > MAX_IMAGE_BYTES) {
-      setServerError("That image is over 10 MB. Try a smaller one.");
-      return;
-    }
-    setServerError("");
-    setImageKey(undefined);
+    if (!IMAGE_TYPES.includes(file.type as (typeof IMAGE_TYPES)[number])) return setError("imageKey", { message: "Use a PNG, JPG, GIF or WebP image." });
+    if (file.size > MAX_IMAGE_BYTES) return setError("imageKey", { message: "That image is over 10 MB. Try a smaller one." });
+    clearErrors("imageKey");
+    setValue("imageKey", "", { shouldDirty: true });
     setImageUrl(URL.createObjectURL(file));
     setUploading(true);
     try {
-      const target = unwrap(
-        await api.POST("/v1/me/uploads", {
-          body: { contentType: file.type as (typeof IMAGE_TYPES)[number], size: file.size },
-        }),
-      );
+      const target = await createUpload({ createUploadRequest: { contentType: file.type as (typeof IMAGE_TYPES)[number], size: file.size } }).unwrap();
       const put = await fetch(target.url, { method: "PUT", headers: target.headers, body: file });
       if (!put.ok) throw new Error(`Upload failed (${put.status})`);
-      setImageKey(target.key);
+      setValue("imageKey", target.key, { shouldDirty: true, shouldValidate: true });
     } catch (err) {
       setImageUrl(undefined);
-      setServerError(err instanceof ApiError ? err.problem.title : "The upload didn't work. Try again.");
+      setError("imageKey", { message: problemMessage(err, "The upload didn't work. Try again.") });
     } finally {
       setUploading(false);
     }
   };
 
-  const toggleTag = (t: string) =>
-    setTags((prev) =>
-      prev.includes(t) ? prev.filter((x) => x !== t) : prev.length < 3 ? [...prev, t] : prev,
-    );
-
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!ready || sending) return;
-    setSending(true);
-    setServerError("");
-    const common = { region: region === "Everywhere" ? null : region, topics: tags, original: true as const };
-    try {
-      unwrap(
-        await api.POST("/v1/me/jokes", {
-          body:
-            kind === "text"
-              ? { kind: "text", setup: setup.trim(), punchline: punchline.trim(), background, ...common }
-              : { kind: "image", imageKey: imageKey!, imageAlt: imageAlt.trim(), caption: caption.trim() || undefined, ...common },
-        }),
-      );
-      showToast("Sent to the curators");
-      void navigate("/studio");
-    } catch (err) {
-      const fields = err instanceof ApiError ? Object.values(err.fieldErrors()) : [];
-      setServerError(fields.length ? fields.join(" ") : errorMessage(err));
-      setSending(false);
-    }
+  const toggleTopic = (t: string) => {
+    const next = v.topics.includes(t) ? v.topics.filter((x) => x !== t) : v.topics.length < 3 ? [...v.topics, t] : v.topics;
+    setValue("topics", next, { shouldDirty: true });
   };
 
-  const missing = !hasContent
-    ? kind === "text"
-      ? "Add a setup and a punchline to submit."
+  // A gentle hint under the button; the field errors themselves appear on submit.
+  const missing =
+    v.kind === "text"
+      ? !v.setup.trim() || !v.punchline.trim()
+        ? "Add a setup and a punchline to submit."
+        : ""
       : uploading
         ? "Uploading the image…"
-        : imageKey
-          ? "Describe the image to submit."
-          : "Add an image to submit."
-    : !original
-      ? "Confirm the joke is your own to submit."
-      : "";
+        : !v.imageKey
+          ? "Add an image to submit."
+          : v.imageAlt.trim().length < 3
+            ? "Describe the image to submit."
+            : "";
+
+  const submit = async (d: z.output<typeof schema>) => {
+    const common = { region: d.region === "Everywhere" ? null : d.region, topics: d.topics, original: true as const };
+    await submitJoke({
+      createJokeRequest:
+        d.kind === "text"
+          ? { kind: "text", setup: d.setup, punchline: d.punchline, background: d.background, ...common }
+          : { kind: "image", imageKey: d.imageKey, imageAlt: d.imageAlt, caption: d.caption || undefined, ...common },
+    }).unwrap();
+    toast.success("Sent to the curators");
+    void navigate("/studio");
+  };
 
   return (
-    <form className="mx-auto grid max-w-wide gap-4 px-4 lg:px-8 lg:pt-7" onSubmit={(e) => void onSubmit(e)} aria-labelledby="create-title">
+    <Form form={form} onSubmit={submit} className="mx-auto max-w-wide gap-4 px-4 lg:px-8 lg:pt-7" aria-labelledby="create-title">
       <header className="-ml-2.5 flex items-center gap-2 pt-3 lg:pt-0">
         <IconButton onClick={() => void navigate(-1)} aria-label="Discard and close">
           <Icon name="close" />
@@ -197,54 +195,26 @@ export function Create() {
           <fieldset className={segmented}>
             <legend className="sr-only">Joke format</legend>
             {(["text", "image"] as const).map((k) => (
-              <label key={k} className={segment(kind === k)}>
-                <input
-                  type="radio"
-                  name="kind"
-                  value={k}
-                  checked={kind === k}
-                  onChange={() => setKind(k)}
-                  className="sr-only"
-                />
+              <label key={k} className={segment(v.kind === k)}>
+                <input type="radio" value={k} {...register("kind")} className="sr-only" />
                 <Icon name={k === "text" ? "comment" : "image"} size={20} />
                 {k === "text" ? "Setup and punchline" : "Image or meme"}
               </label>
             ))}
           </fieldset>
 
-          {kind === "text" ? (
+          {v.kind === "text" ? (
             <>
-              <div className={fieldset}>
-                <FieldHead htmlFor="setup" count={`${setup.length}/${SETUP_MAX}`}>
-                  Setup
-                </FieldHead>
-                <Textarea
-                  id="setup"
-                  className="text-xl font-bold"
-                  rows={3}
-                  maxLength={SETUP_MAX}
-                  value={setup}
-                  onChange={(e) => setSetup(e.target.value)}
-                  placeholder="Why did the scarecrow win an award?"
-                />
-              </div>
-              <div className={fieldset}>
-                <FieldHead htmlFor="punchline" count={`${punchline.length}/${PUNCH_MAX}`}>
-                  Punchline
-                </FieldHead>
-                <input
-                  id="punchline"
-                  className={field("md", "font-marker text-xl")}
-                  maxLength={PUNCH_MAX}
-                  value={punchline}
-                  onChange={(e) => setPunchline(e.target.value)}
-                  placeholder="He was outstanding in his field."
-                  autoComplete="off"
-                />
-                <p className={help}>
-                  Readers see the setup first. The punchline appears after a pause.
-                </p>
-              </div>
+              <FormField name="setup" label={<span className="flex w-full justify-between">Setup <Count value={v.setup} max={SETUP_MAX} /></span>}>
+                <Control as="textarea" className="text-xl font-medium" rows={3} maxLength={SETUP_MAX} placeholder="Why did the scarecrow win an award?" {...register("setup")} />
+              </FormField>
+              <FormField
+                name="punchline"
+                label={<span className="flex w-full justify-between">Punchline <Count value={v.punchline} max={PUNCH_MAX} /></span>}
+                help="Readers see the setup first. The punchline appears after a pause."
+              >
+                <Control className="font-marker text-xl" maxLength={PUNCH_MAX} placeholder="He was outstanding in his field." autoComplete="off" {...register("punchline")} />
+              </FormField>
               <fieldset className={fieldset}>
                 <legend className={label}>Background</legend>
                 <div className="flex gap-2.5">
@@ -254,19 +224,12 @@ export function Create() {
                       className={cn(
                         "grid size-11 cursor-pointer place-items-center rounded-full border-3 border-paper has-focus-visible:outline-3 has-focus-visible:outline-offset-3 has-focus-visible:outline-denim",
                         TONE[b.value],
-                        background === b.value ? "shadow-[0_0_0_3px_var(--color-ink)]" : "shadow-[0_0_0_1px_var(--color-line-strong)]",
+                        v.background === b.value ? "shadow-[0_0_0_3px_var(--color-ink)]" : "shadow-[0_0_0_1px_var(--color-line-strong)]",
                       )}
                     >
-                      <input
-                        type="radio"
-                        name="background"
-                        value={b.value}
-                        checked={background === b.value}
-                        onChange={() => setBackground(b.value)}
-                        className="sr-only"
-                      />
+                      <input type="radio" value={b.value} {...register("background")} className="sr-only" />
                       <span className="sr-only">{b.label}</span>
-                      {background === b.value ? <Icon name="check" size={18} /> : null}
+                      {v.background === b.value ? <Icon name="check" size={18} /> : null}
                     </label>
                   ))}
                 </div>
@@ -274,102 +237,59 @@ export function Create() {
             </>
           ) : (
             <>
-              <div className={fieldset}>
-                <span className={label}>Image</span>
-                <label className="grid cursor-pointer justify-items-center gap-1 rounded-2xl border-2 border-dashed border-line-strong bg-paper px-4 py-7 text-center font-bold hover:border-ink has-focus-visible:border-ink">
-                  <input
-                    type="file"
-                    accept={IMAGE_TYPES.join(",")}
-                    onChange={(e) => void onFile(e)}
-                    className="sr-only"
-                    disabled={uploading}
-                  />
-                  <Icon name="image" size={28} />
-                  <span>
-                    {uploading ? "Uploading…" : imageKey ? "Choose a different image" : "Choose an image"}
-                  </span>
-                  <span className={help}>PNG, JPG, GIF or WebP, up to 10 MB</span>
-                </label>
-              </div>
-              <div className={fieldset}>
-                <FieldHead htmlFor="alt" count={`${imageAlt.length}/200`}>
-                  Describe the image
-                </FieldHead>
-                <input
-                  id="alt"
-                  className={field()}
-                  maxLength={200}
-                  value={imageAlt}
-                  onChange={(e) => setImageAlt(e.target.value)}
-                  placeholder="A dad holding a fish, looking proud"
-                  autoComplete="off"
-                />
-                <p className={help}>For people who use a screen reader. Required.</p>
-              </div>
-              <div className={fieldset}>
-                <FieldHead htmlFor="caption" count={`${caption.length}/80`}>
-                  Caption (optional)
-                </FieldHead>
-                <input
-                  id="caption"
-                  className={field()}
-                  maxLength={80}
-                  value={caption}
-                  onChange={(e) => setCaption(e.target.value)}
-                  placeholder="When the kids ask what's for dinner"
-                  autoComplete="off"
-                />
-              </div>
+              <FormField name="imageKey" label="Image" help="PNG, JPG, GIF or WebP, up to 10 MB">
+                <ImagePicker uploading={uploading} hasImage={Boolean(v.imageKey)} onFile={(e) => void onFile(e)} />
+              </FormField>
+              <FormField
+                name="imageAlt"
+                label={<span className="flex w-full justify-between">Describe the image <Count value={v.imageAlt} max={ALT_MAX} /></span>}
+                help="For people who use a screen reader. Required."
+              >
+                <Control maxLength={ALT_MAX} placeholder="A dad holding a fish, looking proud" autoComplete="off" {...register("imageAlt")} />
+              </FormField>
+              <FormField name="caption" optional label={<span className="flex w-full justify-between">Caption <Count value={v.caption} max={CAPTION_MAX} /></span>}>
+                <Control maxLength={CAPTION_MAX} placeholder="When the kids ask what's for dinner" autoComplete="off" {...register("caption")} />
+              </FormField>
             </>
           )}
 
-          <div className={fieldset}>
-            <label htmlFor="region" className={label}>
-              Who will get it?
-            </label>
-            <Select id="region" value={region} onChange={(e) => setRegion(e.target.value)}>
+          <FormField name="region" label="Who will get it?" help="Pick a country if the joke needs local knowledge to land.">
+            <Control as={"select" as "input"} className="pr-8" {...register("region")}>
               {REGIONS.map((r) => (
                 <option key={r}>{r}</option>
               ))}
-            </Select>
-            <p className={help}>Pick a country if the joke needs local knowledge to land.</p>
-          </div>
+            </Control>
+          </FormField>
 
           <fieldset className={fieldset}>
             <legend className={label}>Topics (up to 3)</legend>
             <div className="flex flex-wrap gap-2">
-              {topicList.map((t) => (
-                <Chip
-                  key={t.slug}
-                  on={tags.includes(t.slug)}
-                  onClick={() => toggleTag(t.slug)}
-                  disabled={!tags.includes(t.slug) && tags.length >= 3}
-                >
+              {(topics?.data ?? []).map((t) => (
+                <Chip key={t.slug} on={v.topics.includes(t.slug)} onClick={() => toggleTopic(t.slug)} disabled={!v.topics.includes(t.slug) && v.topics.length >= 3}>
                   {t.label}
                 </Chip>
               ))}
             </div>
           </fieldset>
 
-          <CheckRow checked={original} onChange={setOriginal} title="I wrote this joke myself.">
-            Jokes copied from elsewhere are taken down and don't earn tips.
-          </CheckRow>
+          <div className="grid gap-1.5">
+            <CheckRow checked={v.original} onChange={(on) => setValue("original", on, { shouldDirty: true, shouldValidate: formState.isSubmitted })} title="I wrote this joke myself.">
+              Jokes copied from elsewhere are taken down and don't earn tips.
+            </CheckRow>
+            {formState.errors.original ? (
+              <p className={errorText} role="alert">
+                {formState.errors.original.message}
+              </p>
+            ) : null}
+          </div>
 
           <div className="sticky bottom-[calc(var(--spacing-nav)+env(safe-area-inset-bottom))] grid gap-2 bg-[linear-gradient(transparent,var(--color-fridge)_30%)] py-3 lg:bottom-0">
-            <button
-              type="submit"
-              className={button({ block: true })}
-              disabled={!ready || sending}
-              aria-describedby="submit-hint"
-            >
-              {sending ? "Sending…" : "Submit for curation"}
+            <FormError />
+            <button type="submit" className={button({ block: true })} disabled={formState.isSubmitting || uploading} aria-busy={formState.isSubmitting || undefined} aria-describedby="submit-hint">
+              {formState.isSubmitting ? "Sending…" : uploading ? "Uploading the image…" : "Submit for curation"}
             </button>
-            <p
-              id="submit-hint"
-              className={serverError ? errorText : help}
-              aria-live="polite"
-            >
-              {serverError || missing}
+            <p id="submit-hint" className={help} aria-live="polite">
+              {missing}
             </p>
           </div>
         </div>
@@ -377,7 +297,7 @@ export function Create() {
         <aside className="-order-1 grid content-start gap-3 lg:sticky lg:top-7 lg:order-none" aria-label="Preview">
           <div className="flex items-center justify-between">
             <h2 className="text-base">Preview</h2>
-            {kind === "text" ? (
+            {v.kind === "text" ? (
               <button
                 type="button"
                 className={button({ variant: "quiet", size: "sm" })}
@@ -390,16 +310,33 @@ export function Create() {
           <div className="max-w-[170px] lg:max-w-none">
             <StoryCard
               face={
-                kind === "text"
-                  ? { kind, setup, punchline, background }
-                  : { kind, imageUrl, caption, imageAlt }
+                v.kind === "text"
+                  ? { kind: "text", setup: v.setup, punchline: v.punchline, background: v.background }
+                  : { kind: "image", imageUrl, caption: v.caption, imageAlt: v.imageAlt }
               }
-              revealed={kind === "image" || showPunch}
+              revealed={v.kind === "image" || showPunch}
               variant="card"
             />
           </div>
         </aside>
       </div>
-    </form>
+    </Form>
+  );
+}
+
+/** The drop zone for an image joke; wired to its <FormField> like any other control. */
+function ImagePicker({ uploading, hasImage, onFile }: { uploading: boolean; hasImage: boolean; onFile: (e: ChangeEvent<HTMLInputElement>) => void }) {
+  const ids = useFieldIds();
+  return (
+    <label
+      className={cn(
+        "grid cursor-pointer justify-items-center gap-1 rounded-lg border border-dashed border-line-strong bg-paper px-4 py-7 text-center font-medium transition-colors duration-120 hover:border-ink-faint hover:bg-fridge has-focus-visible:border-focus",
+        ids["aria-invalid"] && "border-tag-red",
+      )}
+    >
+      <input {...ids} type="file" accept={IMAGE_TYPES.join(",")} onChange={onFile} className="sr-only" disabled={uploading} />
+      <Icon name="image" size={28} />
+      <span>{uploading ? "Uploading…" : hasImage ? "Choose a different image" : "Choose an image"}</span>
+    </label>
   );
 }

@@ -53,6 +53,12 @@ const EnvSchema = z.object({
    * by themselves after a few seconds (phones ending 0000 fail, 1111 cancel).
    */
   MPESA_MODE: z.enum(["fake", "sandbox", "production"]).default("fake"),
+  /**
+   * Fake mode only. "prompt": a tip waits for the tipper to answer a simulated
+   * M-Pesa prompt in the app (approve with any PIN, cancel, or fail on purpose).
+   * "auto": tips settle by themselves after a few seconds, by phone number.
+   */
+  MPESA_FAKE_SETTLE: z.enum(["prompt", "auto"]).default("prompt"),
   MPESA_CONSUMER_KEY: z.string().optional(),
   MPESA_CONSUMER_SECRET: z.string().optional(),
   /** Paybill or till for STK push (tips). */
@@ -65,7 +71,10 @@ const EnvSchema = z.object({
   MPESA_B2C_INITIATOR: z.string().optional(),
   MPESA_B2C_SECURITY_CREDENTIAL: z.string().optional(),
   /** Platform share of each tip, in percent. */
+  /** The platform's default cut of a tip. Admins can add other rates in the finance console. */
   TIP_FEE_PERCENT: z.coerce.number().min(0).max(50).default(10),
+  /** How long earnings stay pending before they can be withdrawn, in case a payment is reversed. */
+  TIP_HOLD_HOURS: z.coerce.number().int().min(0).max(24 * 30).default(72),
   PAYOUT_MIN_KES: z.coerce.number().int().min(1).default(100),
 
   /** Turns request rate limits off. Only for automated tests. */

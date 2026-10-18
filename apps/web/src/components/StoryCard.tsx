@@ -1,5 +1,6 @@
 import type { JokeBackground } from "../data/types.ts";
-import { TONE, cn } from "./ui/index.ts";
+import { TONE } from "@/lib/tones.ts";
+import { cn } from "@/lib/utils.ts";
 
 export interface StoryFace {
   kind: "text" | "image";
@@ -66,16 +67,16 @@ export function StoryCard({
 
   if (face.kind === "image") {
     return (
-      <div className={cn(frame, "bg-ink text-white")}>
+      <div className={cn(frame, "bg-navy text-white")}>
         {face.imageUrl ? (
           <img src={face.imageUrl} alt={face.imageAlt ?? ""} className="size-full object-contain" />
         ) : (
-          <div className="m-auto font-bold text-white/70">Your image shows here</div>
+          <div className="m-auto font-medium text-white/70">Your image shows here</div>
         )}
         {face.caption ? (
           <p
             className={cn(
-              "absolute inset-x-0 bottom-0 bg-linear-to-b from-transparent to-black/75 font-bold",
+              "absolute inset-x-0 bottom-0 bg-linear-to-b from-transparent to-black/75 font-medium",
               variant === "thumb"
                 ? "p-1.5 text-[10cqi]"
                 : "px-[6cqi] pt-6 pb-[7cqi] text-[clamp(1rem,5cqi,1.5rem)]",
@@ -98,7 +99,7 @@ export function StoryCard({
       )}
     >
       <div className={cn("flex flex-col", BODY[variant])}>
-        <p className={cn(SETUP[variant], "leading-[1.12] font-extrabold tracking-[-0.015em] text-balance")}>
+        <p className={cn(SETUP[variant], "leading-[1.12] font-semibold tracking-[-0.015em] text-balance")}>
           {face.setup || "Your setup goes here."}
         </p>
         <p

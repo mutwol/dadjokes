@@ -1,9 +1,31 @@
 import { useEffect, useRef, useState } from "react";
-import type { ClipboardEvent, FormEvent, KeyboardEvent } from "react";
-import { ApiError, api, errorMessage, unwrap } from "../../api/client.ts";
-import type { Creator, Topic } from "../../api/client.ts";
-import { Avatar } from "../../components/Avatar.tsx";
-import { Icon } from "../../components/Icon.tsx";
+import { useFormState, useWatch } from "react-hook-form";
+import type { ClipboardEvent, FormEvent, InputHTMLAttributes, KeyboardEvent, Ref } from "react";
+import { z } from "zod";
+import {
+  is,
+  problemMessage,
+  useCheckHandleQuery,
+  useGoogleSignInMutation,
+  useListCreatorsQuery,
+  useListTopicsQuery,
+  useStartEmailSignInMutation,
+  useVerifyEmailSignInMutation,
+} from "../../api/rtk/index.ts";
+import type { Creator, Topic } from "../../api/rtk/index.ts";
+import { Avatar } from "@/components/ui/avatar.tsx";
+import { button, textButton } from "@/components/ui/button.tsx";
+import { Card } from "@/components/ui/card.tsx";
+import { CheckRow } from "@/components/ui/check-row.tsx";
+import { Chip } from "@/components/ui/chip.tsx";
+import { choice } from "@/components/ui/choice.tsx";
+import { Form, FormError, FormField, SelectField, SubmitButton, TextField, useFieldIds } from "@/components/ui/form.tsx";
+import { Icon } from "@/components/ui/icon.tsx";
+import { errorText, fieldset, help, label } from "@/components/ui/label.tsx";
+import { toast } from "@/components/ui/toast.tsx";
+import { useZodForm } from "@/hooks/useZodForm.ts";
+import { cn } from "@/lib/utils.ts";
+import { useDebouncedValue } from "../../hooks/useDebouncedValue.ts";
 import { NameTag } from "../../components/NameTag.tsx";
 import { StoryCard } from "../../components/StoryCard.tsx";
 import { formatHour } from "../../components/useCountdown.ts";
@@ -15,20 +37,6 @@ import { firstName, handleFromName, useFlow } from "./flow.ts";
 import { enablePush } from "../../api/push.ts";
 import { googleEnabled } from "../../config.ts";
 import { GoogleSignIn } from "./GoogleSignIn.tsx";
-import {
-  Card,
-  CheckRow,
-  Chip,
-  button,
-  choice,
-  cn,
-  errorText,
-  field,
-  fieldset,
-  help,
-  label,
-  textButton,
-} from "../../components/ui/index.ts";
 
 /* Shared by every step. */
 const step = "grid gap-5";
@@ -37,30 +45,31 @@ const lead = "-mt-2 text-ink-soft";
 const small = "text-center text-sm text-ink-soft";
 const fine = "text-center text-xs text-ink-faint";
 const actions = "mt-1 grid gap-2.5";
-const success = "text-sm font-bold text-forest";
+const success = "text-sm font-medium text-forest";
 const primary = button({ size: "lg", block: true });
 const secondary = button({ variant: "quiet", size: "lg", block: true });
 
 /** A field with a fixed prefix ("@", "+254") drawn inside its border. */
 const prefixed =
-  "flex items-center rounded-2xl border-2 border-line-strong bg-paper pl-3.5 focus-within:border-ink has-aria-invalid:border-tag-red";
+  "flex min-h-12 items-center rounded-md border border-line-strong bg-paper pl-3.5 transition-[border-color,box-shadow] duration-120 focus-within:border-focus focus-within:shadow-[0_0_0_3px_color-mix(in_oklab,var(--color-focus)_22%,transparent)] has-aria-invalid:border-tag-red";
 const prefixedInput = "min-h-12 w-full border-0 bg-transparent pr-3.5 pl-1.5 text-base focus:outline-none";
 
 /* ------------------------------------------------------------------ Welcome */
 
 export function WelcomeStep() {
   const { goTo, update } = useFlow();
-  const { setSession, showToast } = useStore();
+  const { setSession } = useStore();
+  const [googleSignIn] = useGoogleSignInMutation();
   const sample = SAMPLE_JOKE;
 
   const onGoogle = async (idToken: string) => {
     try {
-      const session = unwrap(await api.POST("/v1/auth/google", { body: { idToken } }));
+      const session = await googleSignIn({ googleSignInRequest: { idToken } }).unwrap();
       update({ email: session.user.email, name: session.user.name ?? "" });
       // The layout moves signed-in people on: to Today, or to the role step if new.
       setSession(session);
     } catch (e) {
-      showToast(errorMessage(e));
+      toast.error(problemMessage(e));
     }
   };
 
@@ -96,73 +105,42 @@ export function WelcomeStep() {
 
 /* -------------------------------------------------------------------- Email */
 
+const emailSchema = z.object({
+  email: z.string().trim().toLowerCase().min(1, "Enter your email address.").email("Enter an email address like name@example.com."),
+});
+
 export function EmailStep() {
   const { draft, update, next } = useFlow();
-  const { showToast } = useStore();
-  const [email, setEmail] = useState(draft.email);
-  const [error, setError] = useState("");
-  const [sending, setSending] = useState(false);
-
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    const value = email.trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-      setError("Enter an email address like name@example.com.");
-      return;
-    }
-    setSending(true);
-    try {
-      unwrap(await api.POST("/v1/auth/email/start", { body: { email: value } }));
-      update({ email: value.toLowerCase() });
-      next();
-    } catch (err) {
-      // A code sent moments ago is still valid, so carry on to entering it.
-      if (err instanceof ApiError && err.code === "resend_too_soon") {
-        update({ email: value.toLowerCase() });
-        showToast("We already sent you a code. Check your inbox.");
-        next();
-      } else {
-        setError(errorMessage(err));
-      }
-    } finally {
-      setSending(false);
-    }
-  };
+  const [start] = useStartEmailSignInMutation();
+  const form = useZodForm(emailSchema, { defaultValues: { email: draft.email } });
 
   return (
-    <form className={step} onSubmit={(e) => void onSubmit(e)} aria-labelledby="email-title" noValidate>
+    <Form
+      form={form}
+      className={step}
+      aria-labelledby="email-title"
+      onSubmit={async ({ email }) => {
+        try {
+          await start({ startEmailRequest: { email } }).unwrap();
+        } catch (err) {
+          // A code sent moments ago is still valid, so carry on to entering it.
+          if (!is(err, "resend_too_soon")) throw err;
+          toast.info("We already sent you a code. Check your inbox.");
+        }
+        update({ email });
+        next();
+      }}
+    >
       <h1 id="email-title" className={title}>What's your email?</h1>
       <p className={lead}>We'll send you a 6-digit code. No password to remember.</p>
-      <div className={fieldset}>
-        <label htmlFor="email" className={label}>Email</label>
-        <input
-          id="email"
-          className={field("lg")}
-          type="email"
-          inputMode="email"
-          autoComplete="email"
-          autoFocus
-          value={email}
-          onChange={(e) => {
-            setEmail(e.target.value);
-            setError("");
-          }}
-          aria-invalid={Boolean(error)}
-          aria-describedby={error ? "email-error" : undefined}
-          placeholder="name@example.com"
-        />
-        {error ? (
-          <p id="email-error" className={errorText} role="alert">
-            {error}
-          </p>
-        ) : null}
-      </div>
+      <TextField name="email" label="Email" fieldSize="lg" type="email" inputMode="email" autoComplete="email" autoFocus placeholder="name@example.com" />
+      <FormError />
       <div className={actions}>
-        <button type="submit" className={primary} disabled={!email.trim() || sending}>
-          {sending ? "Sending…" : "Send code"}
-        </button>
+        <SubmitButton size="lg" block pendingLabel="Sending…">
+          Send code
+        </SubmitButton>
       </div>
-    </form>
+    </Form>
   );
 }
 
@@ -172,10 +150,12 @@ const CODE_LENGTH = 6;
 
 export function VerifyStep() {
   const { draft, goTo } = useFlow();
-  const { setSession, showToast } = useStore();
+  const { setSession } = useStore();
   const [digits, setDigits] = useState<string[]>(() => Array(CODE_LENGTH).fill(""));
   const [error, setError] = useState("");
   const [checking, setChecking] = useState(false);
+  const [verify] = useVerifyEmailSignInMutation();
+  const [startAgain] = useStartEmailSignInMutation();
   const refs = useRef<(HTMLInputElement | null)[]>([]);
   const code = digits.join("");
 
@@ -222,11 +202,11 @@ export function VerifyStep() {
     e.preventDefault();
     setChecking(true);
     try {
-      const session = unwrap(await api.POST("/v1/auth/email/verify", { body: { email: draft.email, code } }));
+      const session = await verify({ verifyEmailRequest: { email: draft.email, code } }).unwrap();
       // The layout moves signed-in people on: to Today, or to the role step if new.
       setSession(session);
     } catch (err) {
-      setError(errorMessage(err));
+      setError(problemMessage(err));
       setDigits(Array(CODE_LENGTH).fill(""));
       refs.current[0]?.focus();
     } finally {
@@ -236,13 +216,13 @@ export function VerifyStep() {
 
   const resend = async () => {
     try {
-      unwrap(await api.POST("/v1/auth/email/start", { body: { email: draft.email } }));
+      await startAgain({ startEmailRequest: { email: draft.email } }).unwrap();
       setDigits(Array(CODE_LENGTH).fill(""));
       setError("");
       refs.current[0]?.focus();
-      showToast(`New code sent to ${masked}`);
+      toast.success(`New code sent to ${masked}`);
     } catch (err) {
-      showToast(errorMessage(err));
+      toast.error(problemMessage(err));
     }
   };
 
@@ -277,7 +257,7 @@ export function VerifyStep() {
             ref={(el) => {
               refs.current[i] = el;
             }}
-            className="aspect-[4/5] max-h-18 w-full rounded-2xl border-2 border-line-strong bg-paper text-center text-2xl font-extrabold caret-tag-red focus:border-ink focus:shadow-[0_0_0_3px_rgb(28_35_64/0.12)] focus:outline-none aria-invalid:border-tag-red"
+            className="aspect-[4/5] max-h-18 w-full rounded-md border border-line-strong bg-paper text-center text-2xl font-bold caret-tag-red focus:border-ink focus:shadow-[0_0_0_3px_rgb(28_35_64/0.12)] focus:outline-none aria-invalid:border-tag-red"
             value={d}
             onChange={(e) => onChange(i, e.target.value)}
             onKeyDown={(e) => onKeyDown(i, e)}
@@ -388,7 +368,7 @@ export function RoleStep() {
               <span
                 className={cn(
                   "grid size-7 shrink-0 place-items-center rounded-lg border-2",
-                  on ? "border-ink bg-ink text-white" : "border-line-strong bg-paper",
+                  on ? "border-ink bg-ink text-on-ink" : "border-line-strong bg-paper",
                 )}
                 aria-hidden="true"
               >
@@ -418,179 +398,126 @@ type HandleCheck =
 
 const HANDLE_RULE = /^[a-z0-9_]{3,20}$/;
 
-/** Asks the API whether a handle is free, 300ms after typing stops. */
+/** Asks the API whether a handle is free, 300ms after typing stops (cached per handle). */
 function useHandleCheck(handle: string): HandleCheck {
-  const [result, setResult] = useState<{ handle: string; available: boolean; message: string } | null>(null);
+  const settled = useDebouncedValue(handle, 300);
   const valid = HANDLE_RULE.test(handle);
+  const { data, isError, isFetching } = useCheckHandleQuery({ handle: settled }, { skip: !HANDLE_RULE.test(settled) });
 
-  useEffect(() => {
-    if (!valid) return;
-    let cancelled = false;
-    const t = window.setTimeout(() => {
-      void api.GET("/v1/handles/{handle}/availability", { params: { path: { handle } } }).then(({ data }) => {
-        if (cancelled) return;
-        if (!data) {
-          setResult({ handle, available: false, message: "Couldn't check that username. Try again." });
-          return;
-        }
-        const hint = data.suggestion ? ` Try @${data.suggestion}.` : "";
-        setResult({
-          handle,
-          available: data.available,
-          message: data.available
-            ? `@${handle} is available.`
-            : data.reason === "reserved"
-              ? `@${handle} is reserved.${hint}`
-              : `@${handle} is taken.${hint}`,
-        });
-      });
-    }, 300);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(t);
-    };
-  }, [handle, valid]);
-
-  // Everything that doesn't need the server is worked out here, during render.
   if (!handle) return { state: "idle" };
   if (!valid) return { state: "done", available: false, message: "Use 3 to 20 lowercase letters, numbers or underscores." };
-  if (result?.handle !== handle) return { state: "checking" };
-  return { state: "done", available: result.available, message: result.message };
+  if (settled !== handle || isFetching) return { state: "checking" };
+  if (isError || !data) return { state: "done", available: false, message: "Couldn't check that username. Try again." };
+  const hint = data.suggestion ? ` Try @${data.suggestion}.` : "";
+  return {
+    state: "done",
+    available: data.available,
+    message: data.available ? `@${handle} is available.` : data.reason === "reserved" ? `@${handle} is reserved.${hint}` : `@${handle} is taken.${hint}`,
+  };
 }
+
+const profileSchema = z.object({
+  name: z.string().trim().min(2, "Add your name, at least two letters.").max(60, "Keep it under 60 characters."),
+  handle: z.string().trim().toLowerCase().regex(HANDLE_RULE, "Use 3 to 20 lowercase letters, numbers or underscores."),
+  country: z.string(),
+  bio: z.string().trim().max(80, "Keep it to one line, 80 characters."),
+});
 
 export function ProfileStep() {
   const { draft, update, next, saveError, clearSaveError } = useFlow();
-  const [handleTouched, setHandleTouched] = useState(Boolean(draft.handle));
   const writer = draft.roles.includes("writer");
-  const handle = handleTouched ? draft.handle : handleFromName(draft.name);
-  const check = useHandleCheck(handle);
-  const serverError = saveError?.step === "profile" ? saveError.message : "";
+  const form = useZodForm(profileSchema, {
+    defaultValues: { name: draft.name, handle: draft.handle || handleFromName(draft.name), country: draft.country, bio: draft.bio },
+  });
+  const [name, handle, bio] = useWatch({ control: form.control, name: ["name", "handle", "bio"] });
+  const check = useHandleCheck((handle ?? "").toLowerCase());
 
-  const handleOk = check.state === "done" && check.available;
-  const valid = draft.name.trim().length > 1 && handleOk;
-  const handleMessage =
-    serverError || (check.state === "checking" ? "Checking…" : check.state === "done" ? check.message : "Letters, numbers and underscores.");
-  const handleBad = Boolean(serverError) || (check.state === "done" && !check.available);
+  // The username follows the name until the person edits it themselves.
+  useEffect(() => {
+    if (!form.getFieldState("handle").isDirty && !draft.handle) form.setValue("handle", handleFromName(name ?? ""), { shouldValidate: false });
+  }, [name, form, draft.handle]);
+
+  // Saving the whole profile failed on the username (taken since we checked): show it there.
+  useEffect(() => {
+    if (saveError?.step === "profile") form.setError("handle", { type: "server", message: saveError.message }, { shouldFocus: true });
+  }, [saveError, form]);
+
+  const handleStatus =
+    check.state === "checking" ? (
+      "Checking…"
+    ) : check.state === "done" ? (
+      <span className={check.available ? "text-forest" : "text-tag-red-deep"}>{check.message}</span>
+    ) : (
+      "Letters, numbers and underscores."
+    );
 
   return (
-    <form
+    <Form
+      form={form}
       className={step}
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!valid) return;
-        update({ handle });
+      aria-labelledby="profile-title"
+      onSubmit={(v) => {
+        if (check.state !== "done" || !check.available) {
+          form.setError("handle", { type: "availability", message: check.state === "done" ? check.message : "Still checking that username. Try again in a moment." });
+          return;
+        }
+        update({ name: v.name, handle: v.handle, country: v.country, bio: v.bio });
         next();
       }}
-      aria-labelledby="profile-title"
     >
       <h1 id="profile-title" className={title}>Introduce yourself</h1>
       <p className={lead}>
-        {writer
-          ? "This is the name on your sticker when your joke goes out."
-          : "This is how you show up when you comment or react."}
+        {writer ? "This is the name on your sticker when your joke goes out." : "This is how you show up when you comment or react."}
       </p>
 
       <div className="flex items-center gap-4" aria-hidden="true">
-        <Avatar name={draft.name || "?"} tone="denim" size={56} />
-        <NameTag name={firstName(draft.name) || "…"} size="m" tilt={-4} />
+        <Avatar name={name || "?"} tone="denim" size={56} />
+        <NameTag name={firstName(name ?? "") || "…"} size="m" tilt={-4} />
       </div>
 
-      <div className={fieldset}>
-        <label htmlFor="name" className={label}>Name</label>
-        <input
-          id="name"
-          className={field("lg")}
-          autoComplete="name"
-          autoFocus
-          value={draft.name}
-          onChange={(e) => update({ name: e.target.value })}
-          placeholder="Your name"
+      <TextField name="name" label="Name" fieldSize="lg" autoComplete="name" autoFocus placeholder="Your name" />
+
+      <FormField name="handle" label="Username" help={<span aria-live="polite">{handleStatus}</span>}>
+        <PrefixedInput
+          prefix="@"
+          autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
+          {...form.register("handle", {
+            setValueAs: (x: string) => x.toLowerCase(),
+            onChange: () => clearSaveError(),
+          })}
         />
-      </div>
+      </FormField>
 
-      <div className={fieldset}>
-        <label htmlFor="handle" className={label}>Username</label>
-        <div className={prefixed}>
-          <span className="font-bold text-ink-soft" aria-hidden="true">@</span>
-          <input
-            id="handle"
-            className={prefixedInput}
-            autoComplete="username"
-            autoCapitalize="none"
-            spellCheck={false}
-            value={handle}
-            onChange={(e) => {
-              setHandleTouched(true);
-              clearSaveError();
-              update({ handle: e.target.value.toLowerCase() });
-            }}
-            aria-invalid={handleBad}
-            aria-describedby="handle-help"
-          />
-        </div>
-        <p id="handle-help" className={handleBad ? errorText : help} aria-live="polite">
-          {handleMessage}
-        </p>
-      </div>
-
-      <div className={fieldset}>
-        <label htmlFor="country" className={label}>Country</label>
-        <select id="country" className={field("lg")} value={draft.country} onChange={(e) => update({ country: e.target.value })}>
-          {COUNTRIES.map((c) => (
-            <option key={c}>{c}</option>
-          ))}
-        </select>
-        <p className={help}>Some jokes only land if you know the place. We use this to pick them.</p>
-      </div>
+      <SelectField name="country" label="Country" fieldSize="lg" options={COUNTRIES.map((c) => ({ value: c, label: c }))} help="Some jokes only land if you know the place. We use this to pick them." />
 
       {writer ? (
-        <div className={fieldset}>
-          <div className="flex items-baseline justify-between">
-            <label htmlFor="bio" className={label}>One-line bio</label>
-            <span className={help}>{draft.bio.length}/80</span>
-          </div>
-          <input
-            id="bio"
-            className={field("lg")}
-            maxLength={80}
-            value={draft.bio}
-            onChange={(e) => update({ bio: e.target.value })}
-            placeholder="Professional groan-maker. Amateur griller."
-          />
-        </div>
+        <TextField
+          name="bio"
+          label={<span className="flex w-full justify-between">One-line bio <span className={cn(help, "tabular-nums")}>{(bio ?? "").length}/80</span></span>}
+          optional
+          fieldSize="lg"
+          maxLength={80}
+          placeholder="Professional groan-maker. Amateur griller."
+        />
       ) : null}
 
+      <FormError />
       <div className={actions}>
-        <button type="submit" className={primary} disabled={!valid}>
+        <SubmitButton size="lg" block>
           Continue
-        </button>
+        </SubmitButton>
       </div>
-    </form>
+    </Form>
   );
 }
 
 /* ------------------------------------------------------------------- Topics */
 
-/** Loads a list once when the step opens. */
-function useLoad<T>(load: () => Promise<T>): { data?: T; error?: string } {
-  const [state, setState] = useState<{ data?: T; error?: string }>({});
-  const run = useRef(load);
-  useEffect(() => {
-    let cancelled = false;
-    run
-      .current()
-      .then((data) => !cancelled && setState({ data }))
-      .catch((e: unknown) => !cancelled && setState({ error: errorMessage(e) }));
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  return state;
-}
-
 export function TopicsStep() {
   const { draft, update, next } = useFlow();
-  const topics = useLoad(async () => unwrap(await api.GET("/v1/topics")).data);
+  const { data: topicList, error: topicsError, isLoading: topicsLoading } = useListTopicsQuery();
   const toggle = (slug: string) =>
     update({
       topics: draft.topics.includes(slug) ? draft.topics.filter((x) => x !== slug) : [...draft.topics, slug],
@@ -610,9 +537,9 @@ export function TopicsStep() {
       <p className={lead}>Pick a few topics. Curators use them to choose your daily joke.</p>
       <fieldset className={fieldset}>
         <legend className="sr-only">Topics</legend>
-        {topics.error ? <p className={errorText}>{topics.error}</p> : null}
-        <div className="flex flex-wrap gap-2" aria-busy={!topics.data && !topics.error}>
-          {(topics.data ?? []).map((t: Topic) => (
+        {topicsError ? <p className={errorText}>{problemMessage(topicsError)}</p> : null}
+        <div className="flex flex-wrap gap-2" aria-busy={topicsLoading || undefined}>
+          {(topicList?.data ?? []).map((t: Topic) => (
             <Chip key={t.slug} size="lg" on={draft.topics.includes(t.slug)} onClick={() => toggle(t.slug)}>
               {t.label}
             </Chip>
@@ -629,7 +556,7 @@ export function TopicsStep() {
               ["local", `Mostly ${local}`, "Include jokes that need local knowledge to land."],
             ] as const
           ).map(([value, title, body]) => (
-            <label key={value} className={choice(draft.jokeOrigin === value, { tint: false, className: "flex items-start gap-3 rounded-2xl px-4 py-3.5 has-focus-visible:shadow-none" })}>
+            <label key={value} className={choice(draft.jokeOrigin === value, { tint: false, className: "flex items-start gap-3 rounded-lg px-4 py-3.5 has-focus-visible:shadow-none" })}>
               <input
                 className="mt-0.5 size-5 shrink-0 accent-ink" 
                 type="radio"
@@ -659,7 +586,8 @@ export function TopicsStep() {
 
 export function FollowStep() {
   const { draft, update, next } = useFlow();
-  const writers = useLoad(async () => unwrap(await api.GET("/v1/creators", { params: { query: { limit: 20 } } })).data);
+  const { data: creators, error: writersError, isLoading: writersLoading } = useListCreatorsQuery({ limit: 20 });
+  const writerList = creators?.data;
   const toggle = (id: string) =>
     update({
       following: draft.following.includes(id)
@@ -681,16 +609,16 @@ export function FollowStep() {
       <p className={lead}>
         Their jokes are more likely to be your daily pick, and you hear when one of theirs goes out.
       </p>
-      {writers.error ? <p className={errorText}>{writers.error}</p> : null}
-      {writers.data && !writers.data.length ? <p className={help}>No writers yet. You can subscribe later.</p> : null}
-      <ul className="m-0 grid list-none p-0" aria-busy={!writers.data && !writers.error}>
-        {(writers.data ?? []).map((c: Creator) => {
+      {writersError ? <p className={errorText}>{problemMessage(writersError)}</p> : null}
+      {writerList && !writerList.length ? <p className={help}>No writers yet. You can subscribe later.</p> : null}
+      <ul className="m-0 grid list-none p-0" aria-busy={writersLoading || undefined}>
+        {(writerList ?? []).map((c: Creator) => {
           const on = draft.following.includes(c.id);
           return (
             <li key={c.id} className="flex items-center gap-3 border-t border-line py-3.5">
               <Avatar name={c.name} tone={c.tone} size={44} />
               <div className="min-w-0 flex-1">
-                <p className="leading-[1.25] font-extrabold">{c.name}</p>
+                <p className="leading-[1.25] font-semibold">{c.name}</p>
                 {c.bio ? <p className="my-0.5 text-sm">{c.bio}</p> : null}
                 <p className="text-sm text-ink-soft">
                   {c.country ? `${c.country}, ` : ""}
@@ -820,86 +748,94 @@ export function DeliveryStep() {
 
 /* ------------------------------------------------------------------ Payouts */
 
+const KENYAN_MOBILE = /^(?:254|0)?(7|1)\d{8}$/;
+
+const payoutSchema = z
+  .object({
+    method: z.enum(["mpesa", "later"]),
+    phone: z.string().transform((x) => x.replace(/\D/g, "")),
+    pledge: z.boolean().refine((x) => x, "Confirm you'll only submit your own jokes."),
+  })
+  .superRefine((v, ctx) => {
+    if (v.method === "mpesa" && !KENYAN_MOBILE.test(v.phone)) ctx.addIssue({ code: "custom", path: ["phone"], message: "Enter a Kenyan mobile number, like 712 345 678." });
+  });
+
 export function PayoutsStep() {
   const { draft, update, next } = useFlow();
-  const [method, setMethod] = useState<"mpesa" | "later">(draft.payout.method);
-  const [phone, setPhone] = useState(draft.payout.method === "mpesa" ? draft.payout.phone : "");
-  const [pledge, setPledge] = useState(false);
-  const digits = phone.replace(/\D/g, "");
-  const phoneOk = /^(?:254|0)?(7|1)\d{8}$/.test(digits);
-  const valid = pledge && (method === "later" || phoneOk);
+  const form = useZodForm(payoutSchema, {
+    defaultValues: { method: draft.payout.method, phone: draft.payout.method === "mpesa" ? draft.payout.phone : "", pledge: false },
+  });
+  const [method, pledge] = useWatch({ control: form.control, name: ["method", "pledge"] });
+  const formState = useFormState({ control: form.control });
+  const pledgeError = formState.errors.pledge?.message;
 
   return (
-    <form
+    <Form
+      form={form}
       className={step}
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!valid) return;
-        update({ payout: method === "mpesa" ? { method, phone: digits } : { method } });
+      aria-labelledby="payouts-title"
+      onSubmit={(v) => {
+        update({ payout: v.method === "mpesa" ? { method: "mpesa", phone: v.phone } : { method: "later" } });
         next();
       }}
-      aria-labelledby="payouts-title"
     >
       <h1 id="payouts-title" className={title}>Get paid for your jokes</h1>
-      <p className={lead}>
-        Readers can tip you when your joke goes out. Later, writers will also earn a share based on
-        views.
-      </p>
+      <p className={lead}>Readers can tip you when your joke goes out. Later, writers will also earn a share based on views.</p>
 
       <fieldset className={fieldset}>
         <legend className={label}>Where should tips go?</legend>
         <div className="grid gap-2.5">
-          <label className={choice(method === "mpesa", { tint: false, className: "flex items-start gap-3 rounded-2xl px-4 py-3.5 has-focus-visible:shadow-none" })}>
-            <input className="mt-0.5 size-5 shrink-0 accent-ink" type="radio" name="payout" checked={method === "mpesa"} onChange={() => setMethod("mpesa")} />
-            <span className="grid gap-0.5">
-              <strong>M-Pesa</strong>
-              <span className="text-sm text-ink-soft">Tips arrive on your phone within a day.</span>
-            </span>
-          </label>
-          <label className={choice(method === "later", { tint: false, className: "flex items-start gap-3 rounded-2xl px-4 py-3.5 has-focus-visible:shadow-none" })}>
-            <input className="mt-0.5 size-5 shrink-0 accent-ink" type="radio" name="payout" checked={method === "later"} onChange={() => setMethod("later")} />
-            <span className="grid gap-0.5">
-              <strong>Set up later</strong>
-              <span className="text-sm text-ink-soft">Tips wait in your account until you add a payout method.</span>
-            </span>
-          </label>
+          {(
+            [
+              ["mpesa", "M-Pesa", "Tips arrive on your phone within a day."],
+              ["later", "Set up later", "Tips wait in your account until you add a payout method."],
+            ] as const
+          ).map(([value, name, body]) => (
+            <label key={value} className={choice(method === value, { tint: false, className: "flex items-start gap-3 rounded-lg px-4 py-3.5 has-focus-visible:shadow-none" })}>
+              <input className="mt-0.5 size-5 shrink-0 accent-ink" type="radio" value={value} {...form.register("method")} />
+              <span className="grid gap-0.5">
+                <strong>{name}</strong>
+                <span className="text-sm text-ink-soft">{body}</span>
+              </span>
+            </label>
+          ))}
         </div>
       </fieldset>
 
       {method === "mpesa" ? (
-        <div className={fieldset}>
-          <label htmlFor="phone" className={label}>M-Pesa phone number</label>
-          <div className={prefixed}>
-            <span className="font-bold text-ink-soft" aria-hidden="true">+254</span>
-            <input
-              id="phone"
-              className={prefixedInput}
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel-national"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="712 345 678"
-              aria-invalid={Boolean(phone) && !phoneOk}
-              aria-describedby="phone-help"
-            />
-          </div>
-          <p id="phone-help" className={phone && !phoneOk ? errorText : help}>
-            {phone && !phoneOk ? "Enter a Kenyan mobile number, like 712 345 678." : "We'll send a test payment of KES 1 to confirm it."}
-          </p>
-        </div>
+        <FormField name="phone" label="M-Pesa phone number" help="We'll send a test payment of KES 1 to confirm it.">
+          <PrefixedInput prefix="+254" type="tel" inputMode="tel" autoComplete="tel-national" placeholder="712 345 678" {...form.register("phone")} />
+        </FormField>
       ) : null}
 
-      <CheckRow checked={pledge} onChange={setPledge} title="I'll only submit jokes I wrote myself.">
-        Copied jokes are taken down and their tips are returned.
-      </CheckRow>
+      <div className="grid gap-1.5">
+        <CheckRow checked={pledge} onChange={(on) => form.setValue("pledge", on, { shouldDirty: true, shouldValidate: formState.isSubmitted })} title="I'll only submit jokes I wrote myself.">
+          Copied jokes are taken down and their tips are returned.
+        </CheckRow>
+        {pledgeError ? (
+          <p className={errorText} role="alert">
+            {pledgeError}
+          </p>
+        ) : null}
+      </div>
 
       <div className={actions}>
-        <button type="submit" className={primary} disabled={!valid}>
+        <SubmitButton size="lg" block>
           Continue
-        </button>
+        </SubmitButton>
       </div>
-    </form>
+    </Form>
+  );
+}
+
+/** An input with a fixed prefix ("+254") inside its border, wired to its <FormField>. */
+function PrefixedInput({ prefix, ...props }: { prefix: string } & InputHTMLAttributes<HTMLInputElement> & { ref?: Ref<HTMLInputElement> }) {
+  const ids = useFieldIds();
+  return (
+    <div className={prefixed}>
+      <span className="font-medium text-ink-soft" aria-hidden="true">{prefix}</span>
+      <input {...ids} {...props} className={prefixedInput} />
+    </div>
   );
 }
 

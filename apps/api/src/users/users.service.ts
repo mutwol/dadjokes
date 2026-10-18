@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { EventsService } from "../platform/events.service";
 import { and, asc, eq, inArray, ne, notInArray } from "drizzle-orm";
 import { z } from "zod";
 import { AppError, notFound } from "../common/errors";
@@ -34,6 +35,7 @@ export class UsersService {
   constructor(
     @InjectDb() private readonly db: Db,
     private readonly creators: CreatorsService,
+    private readonly events: EventsService,
   ) {}
 
   /** Signs in an existing account or creates one. Email must already be verified. */
@@ -157,6 +159,10 @@ export class UsersService {
       if (req.following.length) await this.creators.subscribeMany(userId, req.following, tx);
       if (req.payout) await this.setPayout(userId, req.payout, tx);
       await tx.update(users).set({ onboardedAt: new Date() }).where(eq(users.id, userId));
+      await this.events.emit(
+        { type: "user.signed_up", userId, payload: { roles: req.roles, country: req.country ?? null }, dedupeKey: `signed_up:${userId}` },
+        tx,
+      );
       return this.getMe(userId, tx);
     });
   }

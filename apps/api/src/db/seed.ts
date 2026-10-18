@@ -20,6 +20,7 @@ import { SEED_JOKES } from "./seed-jokes";
 const SEED_TIMEZONE = "Africa/Nairobi";
 
 export const CURATOR_EMAIL = "curator@daddyjokes.local";
+export const ADMIN_EMAIL = "admin@daddyjokes.local";
 
 const WRITERS: { name: string; handle: string; country: string; bio: string; tone: Tone; readers: number }[] = [
   { name: "Dan Whitfield", handle: "grillmaster_dan", country: "United Kingdom", bio: "Grill on, socks with sandals, jokes at the ready.", tone: "denim", readers: 31 },
@@ -58,10 +59,17 @@ export async function seed(databaseUrl: string) {
       "reader",
     );
     await db.insert(userRoles).values({ userId: curatorId, role: "curator" }).onConflictDoNothing();
+    // An admin for the admin console (/admin): money, people, moderation decisions, automations.
+    const adminId = await upsertUser(
+      db,
+      { email: ADMIN_EMAIL, name: "Site Admin", handle: "site_admin", country: "Kenya", bio: "Keeps the lights on.", tone: "denim" },
+      "reader",
+    );
+    await db.insert(userRoles).values({ userId: adminId, role: "admin" }).onConflictDoNothing();
 
     const jokeCount = await seedJokes(db, writerIds);
     console.log(
-      `Seeded ${TOPICS.length} topics, ${WRITERS.length} writers, ${readerIds.length} readers, a curator (${CURATOR_EMAIL}) and ${jokeCount} jokes.`,
+      `Seeded ${TOPICS.length} topics, ${WRITERS.length} writers, ${readerIds.length} readers, a curator (${CURATOR_EMAIL}), an admin (${ADMIN_EMAIL}) and ${jokeCount} jokes.`,
     );
   } finally {
     await pool.end();

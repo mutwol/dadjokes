@@ -20,6 +20,8 @@ import {
   JokeStatsSchema,
   ReactRequest,
   ReportedItemListSchema,
+  ReportReceiptSchema,
+  ReportsQuery,
   ResolveReportsRequest,
 } from "./schemas";
 
@@ -139,20 +141,20 @@ export class EngagementController {
 
   @Delete("comments/:id")
   @HttpCode(204)
-  @ApiOperation({ operationId: "deleteComment", summary: "Delete my comment (curators: any comment)" })
+  @ApiOperation({ operationId: "deleteComment", summary: "Delete my comment (admins: any comment)" })
   @ApiNoContentResponse({ description: "Deleted" })
   async deleteComment(@Auth() auth: AuthContext, @Param("id", new ParseUUIDPipe()) id: string) {
     await this.engagement.deleteComment(auth.userId, id);
   }
 
   @Post("reports")
-  @HttpCode(204)
+  @HttpCode(200)
   @Throttle({ default: { limit: 20, ttl: 60 * 60_000 } })
   @ApiOperation({ operationId: "report", summary: "Flag a joke or comment for the curators. Safe to repeat." })
   @ApiZodBody(CreateReportRequest)
-  @ApiNoContentResponse({ description: "Received" })
-  async report(@Auth() auth: AuthContext, @Body(zod(CreateReportRequest)) body: CreateReportRequest) {
-    await this.engagement.report(auth.userId, body);
+  @ApiZodResponse(200, ReportReceiptSchema)
+  report(@Auth() auth: AuthContext, @Body(zod(CreateReportRequest)) body: CreateReportRequest) {
+    return this.engagement.report(auth.userId, body);
   }
 
   @Post("events")
@@ -184,16 +186,35 @@ export class EngagementController {
 
   @Get("curation/reports")
   @Roles("curator", "admin")
-  @ApiOperation({ operationId: "listReports", summary: "Open reports, grouped by what was reported" })
+  @ApiOperation({ operationId: "listReports", summary: "Open (or recently resolved) reports, grouped by what was reported" })
+  @ApiZodQuery(ReportsQuery)
   @ApiZodResponse(200, ReportedItemListSchema)
-  reports() {
-    return this.engagement.openReports();
+  reports(@Query(zod(ReportsQuery)) q: ReportsQuery) {
+    return this.engagement.listReports(q.status);
+  }
+
+  @Post("curation/comments/:id/hide")
+  @HttpCode(204)
+  @Roles("curator", "admin")
+  @ApiOperation({ operationId: "hideComment", summary: "Hide a comment from readers (curators and admins)" })
+  @ApiNoContentResponse({ description: "Hidden" })
+  async hideComment(@Auth() auth: AuthContext, @Param("id", new ParseUUIDPipe()) id: string) {
+    await this.engagement.setCommentHidden(auth.userId, id, true);
+  }
+
+  @Post("curation/comments/:id/unhide")
+  @HttpCode(204)
+  @Roles("curator", "admin")
+  @ApiOperation({ operationId: "unhideComment", summary: "Show a hidden comment again (curators and admins)" })
+  @ApiNoContentResponse({ description: "Shown" })
+  async unhideComment(@Auth() auth: AuthContext, @Param("id", new ParseUUIDPipe()) id: string) {
+    await this.engagement.setCommentHidden(auth.userId, id, false);
   }
 
   @Post("curation/reports/resolve")
   @HttpCode(204)
-  @Roles("curator", "admin")
-  @ApiOperation({ operationId: "resolveReports", summary: "Dismiss reports, or take the joke or comment down" })
+  @Roles("admin")
+  @ApiOperation({ operationId: "resolveReports", summary: "Dismiss reports, or take the joke or comment down (admins)" })
   @ApiZodBody(ResolveReportsRequest)
   @ApiNoContentResponse({ description: "Resolved" })
   async resolve(@Auth() auth: AuthContext, @Body(zod(ResolveReportsRequest)) body: ResolveReportsRequest) {

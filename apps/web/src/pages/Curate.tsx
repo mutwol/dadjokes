@@ -1,32 +1,28 @@
-import { useCallback, useEffect, useState } from "react";
-import type { FormEvent } from "react";
-import type React from "react";
-import { ApiError, api, errorMessage, unwrap } from "../api/client.ts";
-import type { CurationCalendar, QueueItem, ReportedItem } from "../api/client.ts";
-import { Avatar } from "../components/Avatar.tsx";
+import { useState } from "react";
+import { z } from "zod";
+import { problemMessage, useDeclineJokeMutation, useGetCurationCalendarQuery, useGetReviewQueueQuery, useScheduleJokeMutation } from "../api/rtk/index.ts";
+import type { CurationCalendar, QueueItem } from "../api/rtk/index.ts";
+import { Avatar } from "@/components/ui/avatar.tsx";
+import { button } from "@/components/ui/button.tsx";
+import { Card, EmptyState } from "@/components/ui/card.tsx";
+import { Form, FormError, SelectField, SubmitButton, TextField } from "@/components/ui/form.tsx";
+import { segment, segmented } from "@/components/ui/segmented.tsx";
+import { toast } from "@/components/ui/toast.tsx";
+import { useZodForm } from "@/hooks/useZodForm.ts";
+import { cn } from "@/lib/utils.ts";
 import { StoryCard } from "../components/StoryCard.tsx";
 import { faceOf } from "../data/face.ts";
 import { longDate, shortDate, weekdayShort } from "../data/dates.ts";
-import { useStore } from "../state/useStore.ts";
-import { Card, EmptyState, Pill, button, cn, errorText, field, segment, segmented } from "../components/ui/index.ts";
+import { useSearchParams } from "react-router";
+import { AppealsPanel } from "../components/moderation/AppealsPanel.tsx";
+import { ReportsPanel } from "../components/moderation/ReportsPanel.tsx";
 
 const muted = "text-sm text-ink-soft";
 const list = "m-0 grid list-none gap-3.5 p-0";
-const small = button({ size: "sm" });
 const smallQuiet = button({ variant: "quiet", size: "sm" });
 
-/** A compact labelled control in a card's action row. */
-function CardField({ label, grow, children }: { label: string; grow?: boolean; children: React.ReactNode }) {
-  return (
-    <label className={cn("grid gap-1 text-sm font-bold", grow && "flex-[1_1_200px]")}>
-      <span>{label}</span>
-      {children}
-    </label>
-  );
-}
-
 /** The row of form controls and buttons at the bottom of a queue card. */
-const actionRow = "flex flex-wrap items-end gap-2.5 border-t border-line pt-3";
+const actionRow = "items-start gap-2.5 border-t border-line pt-3";
 
 const DECLINE_REASONS: { value: QueueItem["joke"]["declineReason"] & string; label: string }[] = [
   { value: "possible_copy", label: "Looks copied" },
@@ -37,6 +33,12 @@ const DECLINE_REASONS: { value: QueueItem["joke"]["declineReason"] & string; lab
 ];
 
 type Calendar = CurationCalendar["days"];
+type DeclineReason = NonNullable<QueueItem["joke"]["declineReason"]>;
+
+const declineSchema = z.object({
+  reason: z.enum(DECLINE_REASONS.map((r) => r.value) as [DeclineReason, ...DeclineReason[]]),
+  note: z.string().trim().max(280, "Keep it under 280 characters."),
+});
 
 /** The first open day with no pick for this joke's region (or everywhere). */
 function firstFreeDay(days: Calendar, region: string | null): string | undefined {
@@ -44,13 +46,15 @@ function firstFreeDay(days: Calendar, region: string | null): string | undefined
 }
 
 export function Curate() {
-  const [tab, setTab] = useState<"queue" | "reports">("queue");
+  const [params, setParams] = useSearchParams();
+  const tab = (["queue", "reports", "appeals"] as const).find((t) => t === params.get("tab")) ?? "queue";
+  const setTab = (t: "queue" | "reports" | "appeals") => setParams(t === "queue" ? {} : { tab: t }, { replace: true });
   return (
     <div className="mx-auto grid max-w-content gap-5 px-4 pb-8">
       <header className="grid gap-1 pt-4.5">
         <h1 className="text-3xl">Curation</h1>
-        <div className={cn(segmented, "mt-1.5 justify-self-start")} role="tablist" aria-label="Curation">
-          {(["queue", "reports"] as const).map((t) => (
+        <div className={cn(segmented, "mt-1.5 grid-cols-3 justify-self-start")} role="tablist" aria-label="Curation">
+          {(["queue", "reports", "appeals"] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -59,144 +63,28 @@ export function Curate() {
               className={segment(tab === t, "px-4.5")}
               onClick={() => setTab(t)}
             >
-              {t === "queue" ? "Review queue" : "Reports"}
+              {t === "queue" ? "Review queue" : t === "reports" ? "Reports" : "Appeals"}
             </button>
           ))}
         </div>
       </header>
-      {tab === "queue" ? <Queue /> : <Reports />}
+      {tab === "queue" ? <Queue /> : tab === "reports" ? <ReportsPanel /> : <AppealsPanel />}
     </div>
   );
 }
 
-const REASON_LABEL: Record<string, string> = {
-  copied: "copied",
-  offensive: "offensive",
-  spam: "spam",
-  other: "other",
-};
-
-function Reports() {
-  const { showToast } = useStore();
-  const [items, setItems] = useState<ReportedItem[] | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void api
-      .GET("/v1/curation/reports")
-      .then(unwrap)
-      .then((r) => {
-        if (!cancelled) setItems(r.data);
-      }, () => showToast("Couldn't load reports."));
-    return () => {
-      cancelled = true;
-    };
-  }, [showToast]);
-
-  const resolve = async (item: ReportedItem, action: "dismiss" | "remove") => {
-    const target = item.commentId ? { commentId: item.commentId } : { jokeId: item.jokeId };
-    const { response } = await api.POST("/v1/curation/reports/resolve", { body: { ...target, action } });
-    if (!response.ok) return showToast("Couldn't resolve that. Try again.");
-    setItems((prev) => prev?.filter((i) => i !== item) ?? null);
-    showToast(action === "remove" ? `${item.target === "joke" ? "Joke" : "Comment"} taken down.` : "Left up. Reports closed.");
-  };
-
-  if (items !== null && !items.length) {
-    return (
-      <EmptyState>
-        <p>No open reports. Everyone's behaving, or at least groaning politely.</p>
-      </EmptyState>
-    );
-  }
-  return (
-    <ul className={list} aria-busy={items === null}>
-      {(items ?? []).map((item) => (
-        <Card as="li" key={`${item.jokeId}-${item.commentId ?? ""}`} className="grid gap-3 p-3.5">
-          <p className={muted}>
-            {item.target === "joke" ? "Joke" : "Comment"} by @{item.authorHandle} · {item.reports}{" "}
-            {item.reports === 1 ? "report" : "reports"} since {shortDate(item.firstReportedAt.slice(0, 10))}
-          </p>
-          <p className="font-extrabold">“{item.preview}”</p>
-          <div className="flex flex-wrap gap-1.5">
-            {Object.entries(item.reasons).map(([reason, n]) => (
-              <Pill key={reason} tone="muted" className="py-0.75">
-                {REASON_LABEL[reason] ?? reason} × {n}
-              </Pill>
-            ))}
-          </div>
-          {item.notes.length ? (
-            <ul className="m-0 pl-4.5 text-sm text-ink-soft">
-              {item.notes.map((n, i) => (
-                <li key={i}>{n}</li>
-              ))}
-            </ul>
-          ) : null}
-          <div className="flex gap-2">
-            <button type="button" className={small} onClick={() => void resolve(item, "remove")}>
-              Take it down
-            </button>
-            <button type="button" className={smallQuiet} onClick={() => void resolve(item, "dismiss")}>
-              Leave it up
-            </button>
-          </div>
-        </Card>
-      ))}
-    </ul>
-  );
-}
-
 function Queue() {
-  const { showToast } = useStore();
-  const [items, setItems] = useState<QueueItem[] | null>(null);
-  const [waiting, setWaiting] = useState(0);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [calendar, setCalendar] = useState<CurationCalendar | null>(null);
-  const [version, setVersion] = useState(0);
+  // Pages accumulate in one cache entry; "Show more" passes the cursor (see endpoints.ts).
+  const [more, setMore] = useState<string | undefined>(undefined);
+  const queue = useGetReviewQueueQuery({ limit: 20, cursor: more }, { refetchOnFocus: true });
+  const { data: calendar = null } = useGetCurationCalendarQuery({ days: 28 });
+  const items = queue.data?.data ?? (queue.isError ? [] : null);
+  const waiting = queue.data?.waiting ?? 0;
+  const nextCursor = queue.data?.nextCursor ?? null;
 
-  const refreshCalendar = useCallback(
-    () => api.GET("/v1/curation/calendar", { params: { query: { days: 28 } } }).then(unwrap),
-    [],
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-    void Promise.all([
-      api.GET("/v1/curation/queue", { params: { query: { limit: 20 } } }).then(unwrap),
-      refreshCalendar(),
-    ]).then(
-      ([queue, cal]) => {
-        if (cancelled) return;
-        setItems(queue.data);
-        setWaiting(queue.waiting);
-        setNextCursor(queue.nextCursor);
-        setCalendar(cal);
-      },
-      () => {
-        if (!cancelled) showToast("Couldn't load the queue. Try again.");
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshCalendar, showToast, version]);
-
-  const done = (id: string, message: string) => {
-    setItems((prev) => prev?.filter((i) => i.joke.id !== id) ?? null);
-    setWaiting((w) => Math.max(0, w - 1));
-    showToast(message);
-    void refreshCalendar().then(setCalendar, () => undefined);
-  };
-
-  const loadMore = async () => {
-    if (!nextCursor) return;
-    try {
-      const page = unwrap(await api.GET("/v1/curation/queue", { params: { query: { limit: 20, cursor: nextCursor } } }));
-      setItems((prev) => [...(prev ?? []), ...page.data]);
-      setNextCursor(page.nextCursor);
-    } catch (e) {
-      showToast(errorMessage(e));
-    }
-  };
+  /** Scheduling or declining already removed the card from the cache (endpoints.ts). */
+  const done = (_id: string, message: string) => toast.success(message);
+  const loadMore = () => nextCursor && setMore(nextCursor);
 
   return (
     <>
@@ -206,10 +94,17 @@ function Queue() {
 
       {calendar ? <CalendarStrip calendar={calendar} /> : null}
 
-      {items !== null && !items.length ? (
+      {queue.isError && !queue.data ? (
+        <EmptyState role="alert">
+          <p>{problemMessage(queue.error, "Couldn't load the queue. Try again.")}</p>
+          <button type="button" className={smallQuiet} onClick={() => void queue.refetch()}>
+            Try again
+          </button>
+        </EmptyState>
+      ) : items !== null && !items.length ? (
         <EmptyState>
           <p>The queue is empty. Nothing to groan at for now.</p>
-          <button type="button" className={smallQuiet} onClick={() => setVersion((v) => v + 1)}>
+          <button type="button" className={smallQuiet} onClick={() => void queue.refetch()}>
             Check again
           </button>
         </EmptyState>
@@ -221,8 +116,8 @@ function Queue() {
         </ul>
       )}
       {nextCursor ? (
-        <button type="button" className={button({ variant: "quiet" })} onClick={() => void loadMore()}>
-          Show more
+        <button type="button" className={button({ variant: "quiet" })} onClick={loadMore} disabled={queue.isFetching} aria-busy={queue.isFetching || undefined}>
+          {queue.isFetching && more ? "Loading…" : "Show more"}
         </button>
       ) : null}
     </>
@@ -252,13 +147,13 @@ function CalendarStrip({ calendar }: { calendar: CurationCalendar }) {
               )}
               title={d.picks.map((p) => `${p.region ?? "Everywhere"}: ${p.setup ?? ""} (${p.creatorName})`).join("\n")}
             >
-              <span className="text-2xs font-bold text-ink-soft">{weekdayShort(d.date)}</span>
-              <span className="font-extrabold">{Number(d.date.slice(8))}</span>
+              <span className="text-2xs font-medium text-ink-soft">{weekdayShort(d.date)}</span>
+              <span className="font-semibold">{Number(d.date.slice(8))}</span>
               <span className="sr-only">
                 {everywhere ? "has a joke" : "no joke yet"}
                 {regional.length ? `, plus ${regional.map((r) => r.region).join(", ")}` : ""}
               </span>
-              {regional.length ? <span className="absolute -top-1.75 -right-1.25 rounded-full bg-tag-red px-1.25 py-px text-[0.65rem] font-extrabold text-white" aria-hidden="true">+{regional.length}</span> : null}
+              {regional.length ? <span className="absolute -top-1.75 -right-1.25 rounded-full bg-tag-red px-1.25 py-px text-[0.65rem] font-semibold text-white" aria-hidden="true">+{regional.length}</span> : null}
             </li>
           );
         })}
@@ -278,50 +173,19 @@ function QueueCard({
 }) {
   const { joke, possibleCopies } = item;
   const suggested = calendar ? firstFreeDay(calendar.days, joke.region) : undefined;
-  const [day, setDay] = useState<string | undefined>(undefined);
   const [declining, setDeclining] = useState(possibleCopies.some((c) => c.similarity >= 0.8));
-  const [reason, setReason] = useState(possibleCopies.length ? "possible_copy" : "not_a_dad_joke");
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const chosenDay = day ?? suggested ?? "";
+  const [scheduleJoke] = useScheduleJokeMutation();
+  const [declineJoke] = useDeclineJokeMutation();
+  const firstOpen = calendar?.firstOpenDay ?? "";
 
-  const schedule = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!chosenDay) return;
-    setBusy(true);
-    setError("");
-    try {
-      unwrap(
-        await api.POST("/v1/curation/jokes/{id}/schedule", {
-          params: { path: { id: joke.id } },
-          body: { deliverOn: chosenDay },
-        }),
-      );
-      onDone(joke.id, `Scheduled for ${longDate(chosenDay)}`);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.problem.title : errorMessage(err));
-      setBusy(false);
-    }
-  };
-
-  const decline = async (e: FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      unwrap(
-        await api.POST("/v1/curation/jokes/{id}/decline", {
-          params: { path: { id: joke.id } },
-          body: { reason: reason as (typeof DECLINE_REASONS)[number]["value"], note: note.trim() || undefined },
-        }),
-      );
-      onDone(joke.id, "Declined. The writer will see why.");
-    } catch (err) {
-      setError(errorMessage(err));
-      setBusy(false);
-    }
-  };
+  const scheduleSchema = z.object({
+    deliverOn: z
+      .string()
+      .min(1, "Pick a day.")
+      .refine((d) => !firstOpen || d >= firstOpen, `The first open day is ${firstOpen ? longDate(firstOpen) : "later"}.`),
+  });
+  const scheduleForm = useZodForm(scheduleSchema, { defaultValues: { deliverOn: suggested ?? "" }, values: suggested ? { deliverOn: suggested } : undefined, resetOptions: { keepDirtyValues: true } });
+  const declineForm = useZodForm(declineSchema, { defaultValues: { reason: possibleCopies.length ? "possible_copy" : "not_a_dad_joke", note: "" } });
 
   const title = joke.setup ?? joke.caption ?? "Image joke";
   return (
@@ -331,9 +195,9 @@ function QueueCard({
           <StoryCard face={faceOf(joke)} revealed animate={false} variant="thumb" />
         </div>
         <div className="grid min-w-0 content-start gap-1.5">
-          <p className="font-extrabold">{joke.setup ?? joke.caption}</p>
+          <p className="font-semibold">{joke.setup ?? joke.caption}</p>
           {joke.punchline ? <p className="font-semibold">{joke.punchline}</p> : null}
-          <div className="flex items-center gap-2 text-sm font-bold">
+          <div className="flex items-center gap-2 text-sm font-medium">
             <Avatar name={joke.creator.name} tone={joke.creator.tone} size={28} />
             <span>
               {joke.creator.name} <span className={muted}>@{joke.creator.handle}</span>
@@ -347,8 +211,8 @@ function QueueCard({
       </div>
 
       {possibleCopies.length ? (
-        <div className="grid gap-1.5 rounded-xl bg-butter px-3 py-2.5 text-sm text-butter-ink-deep" role="note">
-          <p className="font-extrabold">Possible copies</p>
+        <div className="grid gap-1.5 rounded-lg border border-cream-edge bg-butter px-3 py-2.5 text-sm text-butter-ink-deep" role="note">
+          <p className="font-semibold">Possible copies</p>
           <ul className="m-0 grid gap-1 pl-4.5">
             {possibleCopies.map((c) => (
               <li key={c.id}>
@@ -364,61 +228,47 @@ function QueueCard({
       ) : null}
 
       {declining ? (
-        <form className={actionRow} onSubmit={(e) => void decline(e)}>
-          <CardField label="Reason">
-            <select className={field("sm")} value={reason} onChange={(e) => setReason(e.target.value)}>
-              {DECLINE_REASONS.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
-          </CardField>
-          <CardField label="Note for the writer (optional)" grow>
-            <input
-              className={field("sm")}
-              value={note}
-              maxLength={280}
-              onChange={(e) => setNote(e.target.value)}
-              autoComplete="off"
-            />
-          </CardField>
-          <div className="flex gap-2">
-            <button type="submit" className={small} disabled={busy}>
+        <Form
+          form={declineForm}
+          className={cn(actionRow, "grid-cols-1 sm:grid-cols-[12rem_1fr_auto] sm:items-start")}
+          onSubmit={async ({ reason, note }) => {
+            await declineJoke({ id: joke.id, declineJokeRequest: { reason, note: note || undefined } }).unwrap();
+            onDone(joke.id, "Declined. The writer will see why.");
+          }}
+        >
+          <SelectField name="reason" label="Reason" fieldSize="sm" options={DECLINE_REASONS} />
+          <TextField name="note" label="Note for the writer" optional fieldSize="sm" maxLength={280} autoComplete="off" />
+          <div className="flex gap-2 sm:pt-6.5">
+            <SubmitButton variant="danger" size="sm" pendingLabel="Declining…">
               Decline
-            </button>
+            </SubmitButton>
             <button type="button" className={smallQuiet} onClick={() => setDeclining(false)}>
               Schedule instead
             </button>
           </div>
-        </form>
+          <FormError className="sm:col-span-3" />
+        </Form>
       ) : (
-        <form className={actionRow} onSubmit={(e) => void schedule(e)}>
-          <CardField label="Goes out on">
-            <input
-              className={field("sm")}
-              type="date"
-              value={chosenDay}
-              min={calendar?.firstOpenDay}
-              onChange={(e) => setDay(e.target.value)}
-              required
-            />
-          </CardField>
-          <div className="flex gap-2">
-            <button type="submit" className={small} disabled={busy || !chosenDay}>
+        <Form
+          form={scheduleForm}
+          className={cn(actionRow, "grid-cols-1 sm:grid-cols-[12rem_auto] sm:items-start")}
+          onSubmit={async ({ deliverOn }) => {
+            await scheduleJoke({ id: joke.id, scheduleJokeRequest: { deliverOn } }).unwrap();
+            onDone(joke.id, `Scheduled for ${longDate(deliverOn)}`);
+          }}
+        >
+          <TextField name="deliverOn" label="Goes out on" fieldSize="sm" type="date" min={firstOpen || undefined} help={suggested ? "First free day for this region." : undefined} />
+          <div className="flex gap-2 sm:pt-6.5">
+            <SubmitButton size="sm" pendingLabel="Scheduling…">
               Schedule
-            </button>
+            </SubmitButton>
             <button type="button" className={smallQuiet} onClick={() => setDeclining(true)}>
               Decline…
             </button>
           </div>
-        </form>
+          <FormError className="sm:col-span-2" />
+        </Form>
       )}
-      {error ? (
-        <p className={errorText} role="alert">
-          {error}
-        </p>
-      ) : null}
     </Card>
   );
 }

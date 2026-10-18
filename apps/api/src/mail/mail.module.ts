@@ -11,9 +11,10 @@ import { MAIL_QUEUE, MailService } from "./mail.service";
 })
 export class MailModule {}
 
-/** Worker side: also sends it. */
+/** Worker side: also sends it. Workflows queue email from here too. */
 @Module({
   imports: [BullModule.registerQueue({ name: MAIL_QUEUE })],
-  providers: [MailProcessor],
+  providers: [MailProcessor, MailService],
+  exports: [MailService],
 })
 export class MailWorkerModule {}

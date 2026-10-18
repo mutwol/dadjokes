@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* `dark:` follows the resolved theme on <html data-theme>, not just the OS setting. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /*
  * Daddy Jokes design tokens.
  *
@@ -8,6 +11,13 @@
  * `border-ink`; `--radius-2xl` gives `rounded-2xl`; and so on. The default Tailwind
  * palette, type scale, radii and breakpoints are cleared first, so only these exist and
  * a stray `bg-blue-500` or `md:` fails to style anything instead of drifting off-brand.
+ *
+ * Light and dark: the colour tokens below are the light theme. The dark theme
+ * re-declares the same variables under [data-theme="dark"] further down, so every
+ * utility (`bg-paper`, `text-ink-soft`, `border-line/70`) switches with no `dark:`
+ * classes in components. Brand fills that carry white text (tag-red, navy, lawn,
+ * denim, highlighter) stay fixed in both themes; their *text* roles have their own
+ * tokens (`tag-red-deep`, `forest`, `sky-ink`, `butter-ink`) that lighten in dark.
  *
  * Palette: fridge-door white, polo navy, name-tag red, highlighter yellow, lawn green
  * and denim. Punchlines and name tags are "written" in marker; everything else is set
@@ -28,7 +38,9 @@
   --color-line-strong: #c7cfdc; /* input borders, disabled buttons */
 
   --color-tag-red: #e23b3b; /* primary action, brand */
-  --color-tag-red-deep: #b82a2d; /* primary hover, error text */
+  --color-tag-red-deep: #b82a2d; /* error and danger text */
+  --color-tag-red-hover: #c9302f; /* primary button hover (fixed in both themes) */
+  --color-on-ink: #ffffff; /* text on an ink fill: selected chips, tooltips, toasts */
   --color-highlighter: #ffd43b;
   --color-lawn: #2e9e58;
   --color-denim: #3e5c9a;
@@ -42,36 +54,61 @@
   --color-butter-ink: #6b5200;
   --color-butter-ink-deep: #4d3b00;
   --color-sky: #dde7fb; /* scheduled */
+  --color-sky-ink: #2f4880; /* text on sky */
   --color-mint: #d8f1e1; /* delivered, money in */
   --color-forest: #1d6b3b; /* success text */
+  --color-focus: #3e5c9a; /* focus ring */
 
   /* Type */
   --font-sans: "Atkinson Hyperlegible Next Variable", system-ui, sans-serif;
   --font-marker: "Permanent Marker", "Comic Sans MS", cursive;
 
   /*
-   * Major-third scale on a 16px base. No line heights are attached, so text keeps the
-   * line height of its context (1.5 for body copy, 1.15 for headings).
+   * Type scale on a 16px base. Each size carries its own line height (on a 2px grid)
+   * and, from xl up, slightly tighter tracking, so headings don't need extra classes.
+   *
+   * Weights: 400 body, 500 labels and controls, 600 headings and emphasis, 700 page
+   * titles and big numbers. Nothing heavier; the marker font carries the personality.
    */
   --text-*: initial;
   --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
   --text-xs: 0.75rem;
-  --text-sm: 0.8125rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.375rem;
   --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
   --text-lg: 1.125rem;
+  --text-lg--line-height: 1.625rem;
   --text-xl: 1.25rem;
-  --text-2xl: 1.5625rem;
-  --text-3xl: 1.953rem;
-  --text-4xl: 2.441rem;
+  --text-xl--line-height: 1.75rem;
+  --text-xl--letter-spacing: -0.005em;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+  --text-2xl--letter-spacing: -0.01em;
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: 2.25rem;
+  --text-3xl--letter-spacing: -0.015em;
+  --text-4xl: 2.375rem;
+  --text-4xl--line-height: 2.75rem;
+  --text-4xl--letter-spacing: -0.02em;
 
-  /* Radii: 2xl for cards and inputs, 3xl for big panels and story cards. */
+  /*
+   * Radii, deliberately small:
+   * - md (6px): inputs, buttons, chips, segmented controls, menus.
+   * - lg (8px): small surfaces inside cards, tooltips.
+   * - 2xl (10px): cards, panels, tables, dialogs.
+   * - 3xl (14px): story cards and large showcase panels only.
+   * `rounded-full` is for avatars, dots, switches and counts, never for fields.
+   */
   --radius-*: initial;
   --radius-sm: 0.25rem;
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
-  --radius-xl: 0.625rem;
-  --radius-2xl: 0.875rem;
-  --radius-3xl: 1.375rem;
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.625rem;
+  --radius-3xl: 0.875rem;
 
   /* Breakpoints: xs only for squeezing phones, sm for large phones, lg for the desktop layout. */
   --breakpoint-*: initial;
@@ -90,7 +127,8 @@
   /* Height of the phone tab bar; content and sticky footers clear it. */
   --spacing-nav: 4rem;
 
-  --shadow-focus: 0 0 0 3px var(--color-paper), 0 0 0 5px var(--color-denim);
+  --shadow-focus: 0 0 0 2px var(--color-paper), 0 0 0 4px var(--color-focus);
+  --shadow-pop: 0 1px 2px rgb(16 20 36 / 0.06), 0 8px 24px -6px rgb(16 20 36 / 0.18);
   --shadow-tag: 0 1px 0 rgb(28 35 64 / 0.25), 0 6px 14px -8px rgb(28 35 64 / 0.5);
   --shadow-fab: 0 6px 14px -6px rgb(226 59 59 / 0.7);
   --shadow-lift: 0 30px 60px -30px rgb(0 0 0 / 0.5);
@@ -99,7 +137,6 @@
 
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 
-  --animate-toast-in: toast-in 220ms var(--ease-out);
   --animate-viewer-in: viewer-in 240ms var(--ease-out);
   --animate-shimmer: shimmer 1.4s linear infinite;
   --animate-burst: burst 420ms var(--ease-out);
@@ -107,12 +144,6 @@
   --animate-punch-in: punch-in 380ms 160ms var(--ease-out) both;
   --animate-progress: progress linear forwards;
 
-  @keyframes toast-in {
-    from {
-      opacity: 0;
-      translate: 0 8px;
-    }
-  }
   @keyframes viewer-in {
     from {
       opacity: 0;
@@ -145,6 +176,14 @@
       scale: 0.9;
     }
   }
+  @keyframes table-progress {
+    from {
+      translate: -100% 0;
+    }
+    to {
+      translate: 300% 0;
+    }
+  }
   @keyframes progress {
     from {
       transform: scaleX(0);
@@ -155,17 +194,99 @@
   }
 }
 
+/*
+ * Dark theme: a navy-tinted charcoal rather than black. Surfaces get lighter as they
+ * rise (page < card < raised), borders stay low-contrast, and text roles lighten so
+ * they keep at least 4.5:1 on `paper`. Set by theme.ts on <html data-theme>.
+ */
+:root {
+  color-scheme: light;
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-fridge: #0e121c;
+  --color-paper: #161b28;
+  --color-ink: #e8ebf4;
+  --color-ink-soft: #a6adc4;
+  --color-ink-faint: #737a93;
+  --color-line: #252b3c;
+  --color-line-strong: #343b52;
+  --color-on-ink: #0e121c;
+
+  --color-tag-red-deep: #ff8a86;
+  --color-cream: #2a2614;
+  --color-cream-edge: #5a4c1c;
+  --color-butter: #2d2710;
+  --color-butter-ink: #f0cf68;
+  --color-butter-ink-deep: #ffe08a;
+  --color-sky: #1a2541;
+  --color-sky-ink: #a9bff0;
+  --color-mint: #12301f;
+  --color-forest: #74d39a;
+  --color-focus: #8fa8e8;
+
+  --shadow-pop: 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 28px -6px rgb(0 0 0 / 0.6);
+}
+
+/*
+ * A fixed-colour island (yellow joke card, white name tag, marketing panel): inside it
+ * the light tokens apply even in dark mode, so `text-ink` stays navy on yellow.
+ */
+@utility theme-light {
+  color-scheme: light;
+  --color-fridge: #f3f6f9;
+  --color-paper: #ffffff;
+  --color-ink: #1c2340;
+  --color-ink-soft: #4b5373;
+  --color-ink-faint: #8a90a8;
+  --color-line: #dde3ec;
+  --color-line-strong: #c7cfdc;
+  --color-on-ink: #ffffff;
+  --color-tag-red-deep: #b82a2d;
+  --color-focus: #3e5c9a;
+}
+
 @layer base {
   body {
-    @apply bg-fridge text-ink antialiased;
+    @apply bg-fridge text-base text-ink antialiased;
   }
 
   h1,
   h2,
-  h3 {
-    line-height: 1.15;
-    font-weight: 800;
-    letter-spacing: -0.01em;
+  h3,
+  h4 {
+    font-weight: 600;
+    text-wrap: balance;
+  }
+
+  h1 {
+    font-weight: 700;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  strong,
+  b {
+    font-weight: 600;
+  }
+
+  /* Numbers in tables, tiles and counters line up. */
+  td,
+  th,
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Smooth the switch between themes without animating every hover. */
+  html.theme-transition,
+  html.theme-transition * {
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      color 160ms ease !important;
   }
 
   button {
@@ -174,7 +295,7 @@
 
   :focus-visible {
     outline: none;
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-md);
     box-shadow: var(--shadow-focus);
   }
 

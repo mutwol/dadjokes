@@ -1,9 +1,10 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { Link, Navigate } from "react-router";
+import { Link, Navigate, useLocation } from "react-router";
 import { useStore } from "../state/useStore.ts";
 import { NameTag } from "./NameTag.tsx";
-import { Button, button } from "./ui/index.ts";
+import { Button, button } from "@/components/ui/button.tsx";
+import { toast } from "@/components/ui/toast.tsx";
 
 /** The page for someone who can't see a screen yet, with a way forward. */
 const gate = "mx-auto grid max-w-form justify-items-start gap-4 px-4 py-14";
@@ -13,9 +14,12 @@ const gate = "mx-auto grid max-w-form justify-items-start gap-4 px-4 py-14";
  * restored, sends signed-out people to /welcome and half-finished sign-ups
  * back to where onboarding continues.
  */
-export function RequireProfile({ children }: { children: ReactNode }) {
+export function RequireProfile({ children, signedOut }: { children: ReactNode; signedOut?: ReactNode }) {
   const { status, account } = useStore();
+  const { pathname } = useLocation();
   if (status === "loading") return <div className="min-h-dvh" aria-busy="true" />;
+  // Signed-out visitors to the home page get the landing page instead of sign-in.
+  if (!account && signedOut && pathname === "/") return signedOut;
   if (!account) return <Navigate to="/welcome" replace />;
   if (!account.onboarded) return <Navigate to="/welcome/role" replace />;
   return children;
@@ -26,7 +30,7 @@ export function RequireProfile({ children }: { children: ReactNode }) {
  * writing instead of a dead end.
  */
 export function RequireWriter({ children }: { children: ReactNode }) {
-  const { hasRole, setRole, showToast, account } = useStore();
+  const { hasRole, setRole, account } = useStore();
   const [busy, setBusy] = useState(false);
   if (hasRole("writer")) return children;
   return (
@@ -42,7 +46,7 @@ export function RequireWriter({ children }: { children: ReactNode }) {
         onClick={() => {
           setBusy(true);
           setRole("writer", true)
-            .then(() => showToast("You can write jokes now."))
+            .then(() => toast.success("You can write jokes now."))
             .catch(() => undefined)
             .finally(() => setBusy(false));
         }}
@@ -62,6 +66,23 @@ export function RequireCurator({ children }: { children: ReactNode }) {
     <div className={gate}>
       <h1 className="text-3xl">Curators only</h1>
       <p className="text-ink-soft">This is where the daily joke gets picked. Ask an admin if you should have access.</p>
+      <Link to="/" className={button({ variant: "quiet" })}>
+        Back to today
+      </Link>
+    </div>
+  );
+}
+
+/** The admin console is for admins only. */
+export function RequireAdmin({ children }: { children: ReactNode }) {
+  const { hasRole, status, account } = useStore();
+  if (status === "loading") return <div className="min-h-dvh" aria-busy="true" />;
+  if (!account) return <Navigate to="/welcome" replace />;
+  if (hasRole("admin")) return children;
+  return (
+    <div className={gate}>
+      <h1 className="text-3xl">Admins only</h1>
+      <p className="text-ink-soft">The admin console runs the site: money, people, moderation and automations.</p>
       <Link to="/" className={button({ variant: "quiet" })}>
         Back to today
       </Link>

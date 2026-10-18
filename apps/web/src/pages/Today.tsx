@@ -1,10 +1,18 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
 import type React from "react";
 import { Link, useNavigate } from "react-router";
-import { api, unwrap } from "../api/client.ts";
-import type { Creator, DeliveryCard, Joke, Today as TodayData } from "../api/client.ts";
-import { Avatar } from "../components/Avatar.tsx";
-import { Icon } from "../components/Icon.tsx";
+import { problemMessage, useGetJokeQuery, useGetTodayQuery, useListCreatorsQuery, useSubscribeMutation, useUnsubscribeMutation } from "../api/rtk/index.ts";
+import type { Creator, DeliveryCard, Today as TodayData } from "../api/rtk/index.ts";
+import { Avatar } from "@/components/ui/avatar.tsx";
+import { DotBadge } from "@/components/ui/badge.tsx";
+import { button, iconButton } from "@/components/ui/button.tsx";
+import { Card } from "@/components/ui/card.tsx";
+import { Icon } from "@/components/ui/icon.tsx";
+import { field } from "@/components/ui/input.tsx";
+import { skeleton } from "@/components/ui/skeleton.tsx";
+import { toast } from "@/components/ui/toast.tsx";
+import { TONE } from "@/lib/tones.ts";
+import { cn } from "@/lib/utils.ts";
 import { NameTag } from "../components/NameTag.tsx";
 import { StoryCard } from "../components/StoryCard.tsx";
 import { formatHour, useTimeLeft } from "../components/useCountdown.ts";
@@ -12,56 +20,38 @@ import { longDate, weekdayShort } from "../data/dates.ts";
 import { faceOf } from "../data/face.ts";
 import { REACTIONS, compact, groanScore } from "../data/reactions.ts";
 import { useStore } from "../state/useStore.ts";
-import { Card, DotBadge, TONE, button, cn, field, iconButton, skeleton } from "../components/ui/index.ts";
 
-const nameLine = "leading-[1.25] font-extrabold";
+const nameLine = "leading-[1.25] font-semibold";
 const subLine = "text-sm text-ink-soft";
 
 /** A dashed box for "no joke right now" states. */
 function TodayEmpty({ title, children, role }: { title: string; children: React.ReactNode; role?: "alert" }) {
   return (
-    <div className="grid gap-1.5 rounded-3xl border-2 border-dashed border-line-strong px-6 py-8" role={role}>
-      <p className="text-xl font-extrabold">{title}</p>
+    <div className="grid gap-1.5 rounded-2xl border border-dashed border-line-strong px-6 py-8" role={role}>
+      <p className="text-xl font-semibold">{title}</p>
       {children}
     </div>
   );
 }
 
 export function Today() {
-  const { account, hasRole, setRole, showToast, unread } = useStore();
-  const [today, setToday] = useState<TodayData | null>(null);
-  const [failed, setFailed] = useState(false);
-  const [version, setVersion] = useState(0);
-  const deliveryHour = account?.preferences.deliveryHour;
-
-  useEffect(() => {
-    let cancelled = false;
-    api.GET("/v1/me/today").then(unwrap).then(
-      (t) => {
-        if (cancelled) return;
-        setToday(t);
-        setFailed(false);
-      },
-      () => {
-        if (!cancelled) setFailed(true);
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-    // A new delivery time can mean today's joke is due now.
-  }, [version, deliveryHour]);
+  const { account, hasRole, setRole, unread } = useStore();
+  // Changing the delivery time invalidates "Today" (endpoints.ts), so a joke that's now due shows up.
+  // Coming back to the tab also refetches: the joke may have landed while it was in the background.
+  const { data, isError, refetch } = useGetTodayQuery(undefined, { refetchOnFocus: true });
+  const today = data ?? null;
+  const failed = isError && !data;
 
   // Come back to the joke when its hour arrives, without a reload.
   useEffect(() => {
     if (!today) return;
     const wait = Date.parse(today.nextDeliveryAt) - Date.now();
     if (wait <= 0 || wait > 24 * 3_600_000) return;
-    const t = window.setTimeout(() => setVersion((v) => v + 1), wait + 2_000);
+    const t = window.setTimeout(() => void refetch(), wait + 2_000);
     return () => window.clearTimeout(t);
-  }, [today]);
+  }, [today, refetch]);
 
-  const reload = useCallback(() => setVersion((v) => v + 1), []);
+  const reload = () => void refetch();
   const reader = hasRole("reader");
 
   return (
@@ -97,7 +87,7 @@ export function Today() {
                 onClick={() => {
                   void setRole("reader", true)
                     .then(() => {
-                      showToast("Daily jokes are on.");
+                      toast.success("Daily jokes are on.");
                       reload();
                     })
                     .catch(() => undefined);
@@ -157,7 +147,6 @@ export function Today() {
 }
 
 function WeekRail({ today }: { today: TodayData }) {
-  const { showToast } = useStore();
   const navigate = useNavigate();
 
   return (
@@ -178,9 +167,9 @@ function WeekRail({ today }: { today: TodayData }) {
         const onClick = () => {
           if (day.state === "sealed") void navigate(`/view/${day.date}`);
           else if (day.state === "opened" && day.jokeId) void navigate(`/joke/${day.jokeId}`);
-          else if (day.state === "missed") showToast(`${fullDay}'s joke disappeared before you opened it.`);
-          else if (day.state === "none") showToast(`No joke for you on ${fullDay}.`);
-          else showToast(`${fullDay}'s joke arrives at ${formatHour(today.deliveryHour)}.`);
+          else if (day.state === "missed") toast.info(`${fullDay}'s joke disappeared before you opened it.`);
+          else if (day.state === "none") toast.info(`No joke for you on ${fullDay}.`);
+          else toast.info(`${fullDay}'s joke arrives at ${formatHour(today.deliveryHour)}.`);
         };
 
         const description = {
@@ -211,10 +200,10 @@ function WeekRail({ today }: { today: TodayData }) {
                 ) : day.creator ? (
                   <Avatar name={day.creator.name} tone={day.creator.tone} size={44} />
                 ) : (
-                  <span className="text-base font-extrabold">{Number(day.date.slice(8))}</span>
+                  <span className="text-base font-semibold">{Number(day.date.slice(8))}</span>
                 )}
               </span>
-              <span className={cn("text-xs font-bold", isToday ? "text-ink" : "text-ink-faint")}>{isToday ? "Today" : label}</span>
+              <span className={cn("text-xs font-medium", isToday ? "text-ink" : "text-ink-faint")}>{isToday ? "Today" : label}</span>
             </button>
           </li>
         );
@@ -249,20 +238,7 @@ function SealedJoke({ card }: { card: DeliveryCard }) {
 }
 
 function OpenedJoke({ jokeId }: { jokeId: string }) {
-  const [joke, setJoke] = useState<Joke | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void api
-      .GET("/v1/jokes/{id}", { params: { path: { id: jokeId } } })
-      .then(unwrap)
-      .then((j) => {
-        if (!cancelled) setJoke(j);
-      }, () => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [jokeId]);
+  const { data: joke } = useGetJokeQuery({ id: jokeId });
 
   if (!joke) return <div className={cn(skeleton, "min-h-80")} aria-busy="true" />;
   const counts = joke.stats.reactions;
@@ -292,7 +268,7 @@ function OpenedJoke({ jokeId }: { jokeId: string }) {
             <strong className="text-ink">{joke.stats.comments}</strong> comments
           </li>
         </ul>
-        <p className="font-bold">
+        <p className="font-medium">
           {mineMeta ? `You reacted ${mineMeta.emoji} ${mineMeta.label}` : "You haven't reacted yet."}
         </p>
         <div className="flex flex-wrap gap-2.5">
@@ -311,7 +287,7 @@ function OpenedJoke({ jokeId }: { jokeId: string }) {
 }
 
 function NextDelivery({ today }: { today: TodayData }) {
-  const { setDeliveryHour, showToast } = useStore();
+  const { setDeliveryHour } = useStore();
   const left = useTimeLeft(today.nextDeliveryAt);
   return (
     <Card className="flex items-center gap-3 px-4 py-3.5 text-ink-soft">
@@ -327,7 +303,7 @@ function NextDelivery({ today }: { today: TodayData }) {
           onChange={(e) => {
             const h = Number(e.target.value);
             setDeliveryHour(h);
-            showToast(`Delivery time set to ${formatHour(h)}`);
+            toast.success(`Delivery time set to ${formatHour(h)}`);
           }}
         >
           {[...new Set([6, 7, 8, 9, 12, 17, 20, today.deliveryHour])]
@@ -364,40 +340,20 @@ function StreakCard({ today }: { today: TodayData }) {
 }
 
 function CreatorsCard() {
-  const { showToast } = useStore();
-  const [writers, setWriters] = useState<Creator[] | null>(null);
+  const { data } = useListCreatorsQuery({ limit: 4 });
+  const writers = data?.data ?? null;
+  const [subscribe] = useSubscribeMutation();
+  const [unsubscribe] = useUnsubscribeMutation();
 
-  useEffect(() => {
-    let cancelled = false;
-    void api.GET("/v1/creators", { params: { query: { limit: 4 } } }).then(({ data }) => {
-      if (!cancelled) setWriters(data?.data ?? []);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
+  // Optimistic: the button flips at once and rolls back if the call fails (endpoints.ts).
   const toggle = async (c: Creator) => {
     const first = c.name.split(" ")[0];
     const on = c.isSubscribed;
-    // Optimistic update, rolled back if the API call fails.
-    const flip = (subscribed: boolean) =>
-      setWriters((ws) =>
-        ws?.map((w) =>
-          w.id === c.id
-            ? { ...w, isSubscribed: subscribed, subscriberCount: w.subscriberCount + (subscribed ? 1 : -1) }
-            : w,
-        ) ?? null,
-      );
-    flip(!on);
-    const params = { path: { creatorId: c.id } };
-    const { response } = on
-      ? await api.DELETE("/v1/me/subscriptions/{creatorId}", { params })
-      : await api.PUT("/v1/me/subscriptions/{creatorId}", { params });
-    if (response.ok) showToast(on ? `Unsubscribed from ${first}` : `Subscribed to ${first}`);
-    else {
-      flip(on);
-      showToast("Couldn't update your subscription. Try again.");
+    try {
+      await (on ? unsubscribe({ creatorId: c.id }) : subscribe({ creatorId: c.id })).unwrap();
+      toast.success(on ? `Unsubscribed from ${first}` : `Subscribed to ${first}`);
+    } catch (e) {
+      toast.error(problemMessage(e, "Couldn't update your subscription. Try again."));
     }
   };
 

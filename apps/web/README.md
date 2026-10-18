@@ -11,13 +11,16 @@ and the worker. Vite proxies `/v1` to the API on port 3000, so no CORS setup is 
 
 | Route | Screen |
 | --- | --- |
+| `/` (signed out) | Landing page: open a sealed sample joke, how it works, readers and writers, FAQ |
+| `/shop` | Shop placeholder: coming soon, with previews |
+| `/admin/*` | Admin console (admins only): overview, money, engagement, people, moderation, workflows, runs, rule sets, audit log |
 | `/welcome` | Onboarding: email, 6-digit code, role (reader, writer or both), profile, then reader steps (topics, writers to subscribe to, delivery time and notifications) and writer steps (tip payouts, originality pledge). Steps adapt to the roles picked |
 | `/` | Today: this week's status rings, today's joke (sealed until opened), streak, delivery time |
 | `/view/:day` · `/view/:jokeId` | Opens that day's joke (once), or replays an opened one. Status viewer: setup, then the punchline after a pause. Tap right/left or use the arrow keys, hold to pause, Esc to close |
 | `/joke/:id` | Joke detail: creator, subscribe, tip, reactions, groan meter, comments |
 | `/create` | Write a joke: setup and punchline or an image, background, region, topics, originality check, live preview |
 | `/studio` | Creator studio: reach, your submissions, their curation status, withdraw |
-| `/curate` | Curators: review queue with possible copies, calendar of picks, schedule or decline |
+| `/curate` | Curators: review queue with possible copies, calendar of picks, schedule or decline; reports (hide comments) and appeals |
 | `/me` | Profile: switch reading and writing on or off, delivery time, payouts, sign out |
 | `/activity` | Activity: picks, comments, subscribers, tips and payouts, newest first |
 | `/explore` | Placeholder for a later step |
@@ -62,17 +65,27 @@ per-screen CSS files; the only stylesheet is `src/index.css`.
   the desktop layout), page widths (`max-w-wide`, `max-w-content`, …), shadows and animations.
   Tailwind's default palette, type scale, radii and breakpoints are switched off, so only these
   exist. To change a colour or size everywhere, change it there.
-- **Components** in `src/components/ui/`: `Button`, `IconButton`, `TextButton`, `Card`,
-  `EmptyState`, `Chip`, `Switch`, `Pill`, `CountBadge`, `Toast`, `Input`, `Textarea`, `Select` and
-  `CheckRow`. Import them from `components/ui/index.ts`.
-- **Recipes** in `src/components/ui/recipes.ts` are the same looks as plain class strings, for
-  elements that aren't those components: `<Link className={button({ variant: "quiet" })}>`,
+- **Components** live in `src/components/ui/`, shadcn style: one kebab-case file per component
+  (`button.tsx`, `card.tsx`, `badge.tsx`, `form.tsx`, `popover.tsx`, `alert-dialog.tsx`,
+  `toast.tsx`, …), imported straight from that file with the `@/` alias:
+  `import { Button } from "@/components/ui/button.tsx"`. There's no barrel file. Anything that
+  needs behaviour (focus management, positioning, dismissal, stacking) is built on
+  `@base-ui/react` and styled here, so screens never import Base UI directly.
+- **Recipes** sit in the same file as their component, as plain class strings for elements
+  that aren't those components: `<Link className={button({ variant: "quiet" })}>`,
   `<section className={cn(card, "p-4")}>`, `choice(selected)` for selectable tiles,
   `segment(selected)` for segmented controls, `field("lg")` for inputs.
-- **`cn()`** joins classes and resolves conflicts (via tailwind-merge), so a caller's class wins:
+- **Destructive actions always confirm.** Use `<ConfirmDialog>` (a modal) when the action hits
+  the server and can't be taken back, and `<ConfirmPopover>` for removals inside an editor
+  (a rule, a condition, a step). Both take the trigger button, a question, and an `onConfirm`
+  that can be async; the confirm button shows a pending state until it settles.
+- **Feedback goes through toasts**: `toast.success("Draft saved.")`, `toast.error(problemMessage(e))`,
+  `toast.info(...)` from `@/components/ui/toast.tsx`. They stack in the bottom-right corner
+  (above the tab bar on phones). `<Toaster />` is rendered once, in `App.tsx`.
+- **`cn()`** (`@/lib/utils.ts`) joins classes and resolves conflicts (via tailwind-merge), so a caller's class wins:
   `button({ className: "w-full" })`. Put a font size before a line height in the same `cn()`
   call, or the line height is dropped.
-- `TONE` maps a joke background (`red`, `navy`, …) to its background and text colours.
+- `TONE` (`@/lib/tones.ts`) maps a joke background (`red`, `navy`, …) to its background and text colours.
 
 ## Design direction
 

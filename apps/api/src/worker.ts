@@ -10,14 +10,28 @@ import { MailWorkerModule } from "./mail/mail.module";
 import { NotificationsWorkerModule } from "./notifications/notifications.module";
 import { PaymentsWorkerModule } from "./payments/payments.module";
 import { StorageCoreModule } from "./storage/storage.module";
+import { AutomationWorkerModule } from "./automation/automation.module";
+import { PlatformModule } from "./platform/platform.module";
 
 /**
  * The background worker: same codebase and modules as the API, no HTTP.
- * Sends email and push, delivers the daily joke, rolls up stats, and
- * settles M-Pesa tips and payouts.
+ * Sends email and push, delivers the daily joke, rolls up stats, settles
+ * M-Pesa tips and payouts, and runs automation workflows.
  */
 @Module({
-  imports: [AppConfigModule, DbModule, queueRoot, StorageCoreModule, NotificationsWorkerModule, MailWorkerModule, DeliveriesWorkerModule, EngagementWorkerModule, PaymentsWorkerModule],
+  imports: [
+    AppConfigModule,
+    DbModule,
+    PlatformModule,
+    queueRoot,
+    StorageCoreModule,
+    NotificationsWorkerModule,
+    MailWorkerModule,
+    DeliveriesWorkerModule,
+    EngagementWorkerModule,
+    PaymentsWorkerModule,
+    AutomationWorkerModule,
+  ],
 })
 class WorkerModule {}
 

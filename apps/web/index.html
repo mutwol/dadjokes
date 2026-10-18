@@ -5,8 +5,21 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#F3F6F9" />
-    <meta name="description" content="One dad joke a day, delivered like a status." />
-    <title>Daddy Jokes</title>
+    <meta name="description" content="One hand-picked dad joke a day, sealed until you open it. Keep your streak, groan with friends, or write your own and get tipped." />
+    <meta property="og:title" content="Daddy Jokes: one dad joke a day" />
+    <meta property="og:description" content="One hand-picked dad joke a day, sealed until you open it. Read, react, or write your own and get tipped." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary" />
+    <!-- Apply the saved or system theme before first paint (see src/theme/theme.ts). -->
+    <script>
+      (function () {
+        var p = null;
+        try { p = localStorage.getItem("daddyjokes.theme"); } catch (e) {}
+        var dark = p === "dark" || (p !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+      })();
+    </script>
+    <title>Daddy Jokes: one dad joke a day, delivered like a status</title>
   </head>
   <body>
     <div id="root"></div>
